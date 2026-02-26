@@ -1,0 +1,64 @@
+2/2/2026	Comida (Mercado)	4
+3/2/2026	Gastos Medicos	75
+3/2/2026	Gastos Medicos	15
+3/2/2026	Gastos administrativos	17
+4/2/2026	Caterina	10
+4/2/2026	Gastos administrativos	10
+4/2/2026	Caterina	530
+4/2/2026	Comida (Calle)	8
+5/2/2026	Gastos administrativos	19
+6/2/2026	Tenis	54
+7/2/2026	Diversión	25
+7/2/2026	Fiesta cumpleaños	600
+7/2/2026	Diversión	40
+8/2/2026	Diversión	13
+9/2/2026	Caterina	10
+9/2/2026	Club Tachira	46
+9/2/2026	Gastos administrativos	5
+9/2/2026	Gastos administrativos	20
+9/2/2026	Comida (Calle)	8
+9/2/2026	Diversión	7
+9/2/2026	Gastos administrativos	8
+9/2/2026	Diversión	30
+10/2/2026	Tenis	120
+10/2/2026	Comida (Calle)	8
+10/2/2026	Comida (Mercado)	25
+10/2/2026	Comida (Mercado)	34
+10/2/2026	Fiesta cumpleaños	75
+10/2/2026	Tenis	60
+10/2/2026	Fiesta cumpleaños	220
+11/2/2026	Caterina	222
+11/2/2026	Fiesta cumpleaños	16
+11/2/2026	Comida (Calle)	8
+11/2/2026	Caterina	20
+11/2/2026	Barberia	10
+11/2/2026	Diversión	4
+12/2/2026	Comida (Calle)	8
+12/2/2026	Fiesta cumpleaños	14
+13/2/2026	Gastos administrativos	7
+13/2/2026	Gastos administrativos	8
+13/2/2026	Comida (Mercado)	16
+13/2/2026	Comida (Calle)	7
+13/2/2026	Fiesta cumpleaños	126
+14/2/2026	Diversión	10
+15/2/2026	Caterina	21
+15/2/2026	Comida (Calle)	5
+15/2/2026	Fiesta cumpleaños	600
+16/2/2026	Tenis	60
+16/2/2026	Comida (Calle)	5
+16/2/2026	Comida (Mercado)	8
+17/2/2026	Gastos administrativos	4
+17/2/2026	Comida (Mercado)	14
+18/2/2026	Amazon / ebay / Fletes	16
+20/2/2026	Amazon / ebay / Fletes	34
+20/2/2026	Comida (Calle)	15
+21/2/2026	Tenis	22
+21/2/2026	Gastos Medicos	20
+21/2/2026	Gasolina	8
+21/2/2026	Diversión	10
+23/2/2026	Comida (Mercado)	10
+23/2/2026	Varios	80
+23/2/2026	Tenis	4
+23/2/2026	Comida (Calle)	8
+23/2/2026	Gastos administrativos	10
+23/2/2026	Caterina	10
