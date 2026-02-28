@@ -11,6 +11,7 @@ import { TbLoaderQuarter } from 'react-icons/tb';
 import NuevoRegistro from './pages/NuevoRegistro';
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Administracion = lazy(() => import('./pages/Administracion'));
+const Estadisticas = lazy(() => import('./pages/Estadisticas'));
 
 const PageLoader = () => (
   <div className="flex justify-center items-center py-20">
@@ -40,6 +41,11 @@ function App() {
               <Route path="admin" element={
                 <ProtectedRoute>
                   <Administracion />
+                </ProtectedRoute>
+              } />
+              <Route path="estadisticas" element={
+                <ProtectedRoute>
+                  <Estadisticas />
                 </ProtectedRoute>
               } />
             </Route>

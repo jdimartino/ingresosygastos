@@ -2,7 +2,7 @@ import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 // wait, we need to import icons from react-icons, fixing it below
-import { TbPencilPlus, TbReportMoney, TbLogout, TbLogin, TbSettings } from "react-icons/tb";
+import { TbPencilPlus, TbReportMoney, TbLogout, TbLogin, TbSettings, TbChartBar } from "react-icons/tb";
 
 const Layout = () => {
     const { user, loginWithGoogle, logOut } = useAuth();
@@ -11,6 +11,7 @@ const Layout = () => {
     const navItems = [
         { name: 'Registrar', path: '/registrar', icon: TbPencilPlus, public: true },
         { name: 'Dashboard', path: '/dashboard', icon: TbReportMoney, public: false },
+        { name: 'Estadísticas', path: '/estadisticas', icon: TbChartBar, public: false },
         { name: 'Admin', path: '/admin', icon: TbSettings, public: false },
     ];
 
