@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
-import { collection, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDocs, query, limit } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { TbBusinessplan, TbFileInvoice, TbCheck, TbCalculator, TbChevronDown, TbChevronUp } from 'react-icons/tb';
 import AutocompleteInput from '../components/AutocompleteInput';
@@ -15,16 +15,18 @@ const IngresoPanel = () => {
     });
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [validationError, setValidationError] = useState('');
     const [clientesTotales, setClientesTotales] = useState([]);
 
     useEffect(() => {
         const fetchClientes = async () => {
             try {
-                const querySnapshot = await getDocs(collection(db, 'ingresos'));
+                // Fix 9: límite de 200 docs para el autocomplete
+                const querySnapshot = await getDocs(query(collection(db, 'ingresos'), limit(200)));
                 const list = querySnapshot.docs.map(doc => doc.data().cliente);
                 setClientesTotales([...new Set(list)].filter(Boolean).sort());
-            } catch (error) {
-                console.error('Error fetching clients:', error);
+            } catch {
+                // Fallo silencioso: el autocomplete simplemente no muestra sugerencias
             }
         };
         fetchClientes();
@@ -43,7 +45,19 @@ const IngresoPanel = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!formData.cliente || !formData.montoBase || !formData.porcentaje) return;
+        setValidationError('');
+
+        // Fix 7: Feedback claro en validación
+        const cliente = formData.cliente.trim();
+        const montoBase = parseFloat(formData.montoBase);
+        const porcentaje = parseFloat(formData.porcentaje);
+
+        if (!cliente) { setValidationError('El campo Cliente es obligatorio.'); return; }
+        if (!formData.montoBase) { setValidationError('El Monto Base es obligatorio.'); return; }
+        if (!formData.porcentaje) { setValidationError('El Porcentaje es obligatorio.'); return; }
+        if (montoBase <= 0) { setValidationError('El Monto Base debe ser mayor a 0.'); return; }
+        // Fix 4: validación de rango en porcentaje
+        if (porcentaje < 0 || porcentaje > 100) { setValidationError('El Porcentaje debe estar entre 0 y 100.'); return; }
 
         setLoading(true);
         setSuccess(false);
@@ -51,18 +65,17 @@ const IngresoPanel = () => {
             const ingresoReal = calculateIngresoReal();
             await addDoc(collection(db, 'ingresos'), {
                 fecha: formData.fecha,
-                cliente: formData.cliente,
-                montoBase: parseFloat(formData.montoBase),
-                porcentaje: parseFloat(formData.porcentaje),
+                cliente,          // Fix 15: trimmed
+                montoBase,
+                porcentaje,
                 ingresoReal,
                 timestampRegistro: serverTimestamp()
             });
             setSuccess(true);
             setFormData(prev => ({ ...prev, montoBase: '', cliente: '' }));
             setTimeout(() => setSuccess(false), 3000);
-        } catch (error) {
-            console.error('Error guardando ingreso:', error);
-            alert('Hubo un error al guardar el registro. Revisa la consola.');
+        } catch {
+            setValidationError('Error al guardar el registro. Intenta nuevamente.');
         } finally {
             setLoading(false);
         }
@@ -81,6 +94,7 @@ const IngresoPanel = () => {
                     name="fecha"
                     value={formData.fecha}
                     onChange={handleChange}
+                    aria-label="Fecha del ingreso"
                     className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-700 border-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
                     required
                 />
@@ -95,6 +109,7 @@ const IngresoPanel = () => {
                     onChange={handleChange}
                     placeholder="Selecciona o escribe un nombre"
                     required={true}
+                    ariaLabel="Nombre del cliente"
                 />
             </div>
 
@@ -109,6 +124,7 @@ const IngresoPanel = () => {
                         value={formData.montoBase}
                         onChange={handleChange}
                         placeholder="0.00"
+                        aria-label="Monto base del ingreso"
                         className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-700 border-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
                         required
                     />
@@ -119,10 +135,12 @@ const IngresoPanel = () => {
                         type="number"
                         step="0.1"
                         min="0"
+                        max="100"
                         name="porcentaje"
                         value={formData.porcentaje}
                         onChange={handleChange}
                         placeholder="0"
+                        aria-label="Porcentaje de comisión"
                         className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-700 border-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
                         required
                     />
@@ -135,6 +153,11 @@ const IngresoPanel = () => {
                     ${calculateIngresoReal().toFixed(2)}
                 </div>
             </div>
+
+            {/* Fix 7: Mensaje de error visible */}
+            {validationError && (
+                <p className="text-sm text-red-600 dark:text-red-400 font-medium" role="alert">{validationError}</p>
+            )}
 
             <button
                 type="submit"
@@ -157,6 +180,7 @@ const GastoPanel = () => {
     });
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [validationError, setValidationError] = useState('');
     const [categorias, setCategorias] = useState([]);
     const [detalles, setDetalles] = useState([]);
 
@@ -168,19 +192,29 @@ const GastoPanel = () => {
     const [rateLoading, setRateLoading] = useState(false);
     const [rateLastUpdate, setRateLastUpdate] = useState(null);
 
+    // Fix 2: API externa con timeout de 8s y validación de respuesta
     const fetchBinanceRate = async () => {
         setRateLoading(true);
         try {
-            const res = await fetch('https://ve.dolarapi.com/v1/dolares');
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+            const res = await fetch('https://ve.dolarapi.com/v1/dolares', { signal: controller.signal });
+            clearTimeout(timeoutId);
+
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
             const data = await res.json();
-            const paralelo = data.find(item => item.fuente === 'paralelo');
-            if (paralelo && paralelo.promedio) {
-                setBinanceRate(paralelo.promedio);
-                setCalcTasa(paralelo.promedio.toString());
-                setRateLastUpdate(new Date());
-            }
-        } catch (error) {
-            console.error('Error fetching Binance rate:', error);
+            if (!Array.isArray(data)) throw new Error('Formato de respuesta inválido');
+
+            const paralelo = data.find(item => item?.fuente === 'paralelo' && item?.promedio);
+            if (!paralelo) throw new Error('Tasa paralelo no encontrada');
+
+            setBinanceRate(paralelo.promedio);
+            setCalcTasa(paralelo.promedio.toString());
+            setRateLastUpdate(new Date());
+        } catch {
+            // Fallo silencioso: el usuario puede ingresar la tasa manualmente
         } finally {
             setRateLoading(false);
         }
@@ -212,13 +246,14 @@ const GastoPanel = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const querySnapshot = await getDocs(collection(db, 'gastos'));
+                // Fix 9: límite de 200 docs para el autocomplete
+                const querySnapshot = await getDocs(query(collection(db, 'gastos'), limit(200)));
                 const cats = querySnapshot.docs.map(doc => doc.data().categoria);
                 const dets = querySnapshot.docs.map(doc => doc.data().detalle);
                 setCategorias([...new Set(cats)].filter(Boolean).sort());
                 setDetalles([...new Set(dets)].filter(Boolean).sort());
-            } catch (error) {
-                console.error('Error fetching data:', error);
+            } catch {
+                // Fallo silencioso: el autocomplete simplemente no muestra sugerencias
             }
         };
         fetchData();
@@ -231,24 +266,31 @@ const GastoPanel = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!formData.categoria || !formData.monto) return;
+        setValidationError('');
+
+        // Fix 7: Feedback claro en validación
+        const categoria = formData.categoria.trim();
+        const monto = parseFloat(formData.monto);
+
+        if (!categoria) { setValidationError('La Categoría es obligatoria.'); return; }
+        if (!formData.monto) { setValidationError('El Monto es obligatorio.'); return; }
+        if (monto <= 0) { setValidationError('El Monto debe ser mayor a 0.'); return; }
 
         setLoading(true);
         setSuccess(false);
         try {
             await addDoc(collection(db, 'gastos'), {
                 fecha: formData.fecha,
-                categoria: formData.categoria,
-                monto: parseFloat(formData.monto),
-                detalle: formData.detalle,
+                categoria,                    // Fix 15: trimmed
+                monto,
+                detalle: formData.detalle.trim(), // Fix 15: trimmed
                 timestampRegistro: serverTimestamp()
             });
             setSuccess(true);
             setFormData(prev => ({ ...prev, monto: '', detalle: '' }));
             setTimeout(() => setSuccess(false), 3000);
-        } catch (error) {
-            console.error('Error guardando gasto:', error);
-            alert('Hubo un error al guardar el registro. Revisa la consola.');
+        } catch {
+            setValidationError('Error al guardar el registro. Intenta nuevamente.');
         } finally {
             setLoading(false);
         }
@@ -267,6 +309,7 @@ const GastoPanel = () => {
                     name="fecha"
                     value={formData.fecha}
                     onChange={handleChange}
+                    aria-label="Fecha del gasto"
                     className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-700 border-none focus:ring-2 focus:ring-red-500 text-gray-900 dark:text-white"
                     required
                 />
@@ -281,6 +324,7 @@ const GastoPanel = () => {
                     onChange={handleChange}
                     placeholder="Selecciona o escribe una categoría"
                     required={true}
+                    ariaLabel="Categoría del gasto"
                 />
             </div>
 
@@ -304,6 +348,7 @@ const GastoPanel = () => {
                             <span className="text-gray-500 dark:text-gray-400 flex items-center gap-2">
                                 📡 Tasa Binance: <span className="font-bold text-gray-800 dark:text-gray-200">{rateLoading ? 'Cargando...' : binanceRate ? `${binanceRate} Bs/$` : 'N/A'}</span>
                             </span>
+                            {/* Fix 10: rateLastUpdate ya está protegido por el &&, safe */}
                             {rateLastUpdate && (
                                 <span className="text-gray-400">
                                     Actualizado: {format(rateLastUpdate, 'HH:mm:ss')}
@@ -321,6 +366,7 @@ const GastoPanel = () => {
                                     value={calcMontoBs}
                                     onChange={(e) => setCalcMontoBs(e.target.value)}
                                     placeholder="0.00"
+                                    aria-label="Monto en bolívares"
                                     className="w-full px-3 py-2 text-sm rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
                                 />
                             </div>
@@ -333,6 +379,7 @@ const GastoPanel = () => {
                                     value={calcTasa}
                                     onChange={(e) => setCalcTasa(e.target.value)}
                                     placeholder="0.00"
+                                    aria-label="Tasa de cambio VES por USD"
                                     className="w-full px-3 py-2 text-sm rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
                                 />
                             </div>
@@ -366,6 +413,7 @@ const GastoPanel = () => {
                     value={formData.monto}
                     onChange={handleChange}
                     placeholder="0.00"
+                    aria-label="Monto del gasto en USD"
                     className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-700 border-none focus:ring-2 focus:ring-red-500 text-gray-900 dark:text-white text-xl font-bold"
                     required
                 />
@@ -380,8 +428,14 @@ const GastoPanel = () => {
                     onChange={handleChange}
                     placeholder="Ej. Almuerzo negocio"
                     required={false}
+                    ariaLabel="Detalle adicional del gasto"
                 />
             </div>
+
+            {/* Fix 7: Mensaje de error visible */}
+            {validationError && (
+                <p className="text-sm text-red-600 dark:text-red-400 font-medium" role="alert">{validationError}</p>
+            )}
 
             <button
                 type="submit"

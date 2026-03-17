@@ -84,13 +84,14 @@ const Estadisticas = () => {
                     end = format(endOfMonth(now), 'yyyy-MM-dd') + 'T23:59:59';
                 }
 
-                const [ingSnap, gasSnap] = await Promise.all([
+                // Fix 6: allSettled para que un fallo no anule los dos resultados
+                const [ingResult, gasResult] = await Promise.allSettled([
                     getDocs(query(collection(db, 'ingresos'), where('fecha', '>=', start), where('fecha', '<=', end))),
                     getDocs(query(collection(db, 'gastos'), where('fecha', '>=', start), where('fecha', '<=', end))),
                 ]);
 
-                const ingresos = ingSnap.docs.map(d => d.data());
-                const gastos = gasSnap.docs.map(d => d.data());
+                const ingresos = ingResult.status === 'fulfilled' ? ingResult.value.docs.map(d => d.data()) : [];
+                const gastos = gasResult.status === 'fulfilled' ? gasResult.value.docs.map(d => d.data()) : [];
 
                 let monthly = [];
                 let daily = [];

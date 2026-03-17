@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { TbX, TbCheck, TbCalculator } from 'react-icons/tb';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, limit } from 'firebase/firestore';
 import AutocompleteInput from './AutocompleteInput';
 
 /**
@@ -33,22 +33,23 @@ const EditRecordModal = ({ record, type, onClose, onSaved }) => {
     const [categorias, setCategorias] = useState([]);
     const [detalles, setDetalles] = useState([]);
 
+    // Fix 9: límite de 200 docs para el autocomplete
     useEffect(() => {
         const fetchOptions = async () => {
             try {
                 if (isIngreso) {
-                    const snap = await getDocs(collection(db, 'ingresos'));
+                    const snap = await getDocs(query(collection(db, 'ingresos'), limit(200)));
                     const list = snap.docs.map(doc => doc.data().cliente);
                     setClientesTotales([...new Set(list)].filter(Boolean).sort());
                 } else {
-                    const snap = await getDocs(collection(db, 'gastos'));
+                    const snap = await getDocs(query(collection(db, 'gastos'), limit(200)));
                     const cats = snap.docs.map(doc => doc.data().categoria);
                     const dets = snap.docs.map(doc => doc.data().detalle);
                     setCategorias([...new Set(cats)].filter(Boolean).sort());
                     setDetalles([...new Set(dets)].filter(Boolean).sort());
                 }
-            } catch (err) {
-                console.error("Error fetching autocomplete options:", err);
+            } catch {
+                // Fallo silencioso: el autocomplete simplemente no muestra sugerencias
             }
         };
         fetchOptions();
@@ -71,13 +72,28 @@ const EditRecordModal = ({ record, type, onClose, onSaved }) => {
 
     const handleSave = async () => {
         setError('');
-        if (isIngreso && (!formData.cliente || !formData.montoBase || !formData.porcentaje)) {
-            setError('Cliente, Monto Base y Porcentaje son obligatorios.');
-            return;
-        }
-        if (!isIngreso && (!formData.categoria || !formData.monto)) {
-            setError('Categoría y Monto son obligatorios.');
-            return;
+
+        // Fix 4: validación con rangos + Fix 15: trim de strings
+        if (isIngreso) {
+            const cliente = formData.cliente.trim();
+            const montoBase = parseFloat(formData.montoBase);
+            const porcentaje = parseFloat(formData.porcentaje);
+
+            if (!cliente || !formData.montoBase || !formData.porcentaje) {
+                setError('Cliente, Monto Base y Porcentaje son obligatorios.');
+                return;
+            }
+            if (montoBase <= 0) { setError('El Monto Base debe ser mayor a 0.'); return; }
+            if (porcentaje < 0 || porcentaje > 100) { setError('El Porcentaje debe estar entre 0 y 100.'); return; }
+        } else {
+            const categoria = formData.categoria.trim();
+            const monto = parseFloat(formData.monto);
+
+            if (!categoria || !formData.monto) {
+                setError('Categoría y Monto son obligatorios.');
+                return;
+            }
+            if (monto <= 0) { setError('El Monto debe ser mayor a 0.'); return; }
         }
 
         setSaving(true);
@@ -86,7 +102,7 @@ const EditRecordModal = ({ record, type, onClose, onSaved }) => {
             const payload = isIngreso
                 ? {
                     fecha: formData.fecha,
-                    cliente: formData.cliente,
+                    cliente: formData.cliente.trim(),          // Fix 15: trimmed
                     montoBase: parseFloat(formData.montoBase),
                     porcentaje: parseFloat(formData.porcentaje),
                     ingresoReal,
@@ -94,15 +110,15 @@ const EditRecordModal = ({ record, type, onClose, onSaved }) => {
                 }
                 : {
                     fecha: formData.fecha,
-                    categoria: formData.categoria,
+                    categoria: formData.categoria.trim(),      // Fix 15: trimmed
                     monto: parseFloat(formData.monto),
-                    detalle: formData.detalle,
+                    detalle: formData.detalle.trim(),          // Fix 15: trimmed
                     timestampModificado: serverTimestamp(),
                 };
             await updateDoc(docRef, payload);
             onSaved();
-        } catch (err) {
-            console.error('Error actualizando registro:', err);
+        } catch {
+            // Fix 12: sin console.error que exponga detalles internos
             setError('Error al guardar. Intenta nuevamente.');
         } finally {
             setSaving(false);
@@ -125,7 +141,7 @@ const EditRecordModal = ({ record, type, onClose, onSaved }) => {
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                         Editar {isIngreso ? 'Ingreso' : 'Gasto'}
                     </h3>
-                    <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                    <button onClick={onClose} aria-label="Cerrar modal" className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                         <TbX size={20} />
                     </button>
                 </div>
@@ -137,6 +153,7 @@ const EditRecordModal = ({ record, type, onClose, onSaved }) => {
                     <div>
                         <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Fecha</label>
                         <input type="date" name="fecha" value={formData.fecha} onChange={handleChange}
+                            aria-label="Fecha del registro"
                             className={`w-full px-3 py-2.5 text-sm rounded-xl bg-gray-50 dark:bg-gray-700 border-none focus:ring-2 ${accentClass} text-gray-900 dark:text-white`} />
                     </div>
 
@@ -151,17 +168,20 @@ const EditRecordModal = ({ record, type, onClose, onSaved }) => {
                                     onChange={handleChange}
                                     placeholder="Selecciona o escribe un nombre"
                                     required={true}
+                                    ariaLabel="Nombre del cliente"
                                 />
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Monto Base ($)</label>
                                     <input type="number" step="0.01" min="0" name="montoBase" value={formData.montoBase} onChange={handleChange}
+                                        aria-label="Monto base del ingreso"
                                         className={`w-full px-3 py-2.5 text-sm rounded-xl bg-gray-50 dark:bg-gray-700 border-none focus:ring-2 ${accentClass} text-gray-900 dark:text-white`} />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Porcentaje (%)</label>
-                                    <input type="number" step="0.1" min="0" name="porcentaje" value={formData.porcentaje} onChange={handleChange}
+                                    <input type="number" step="0.1" min="0" max="100" name="porcentaje" value={formData.porcentaje} onChange={handleChange}
+                                        aria-label="Porcentaje de comisión"
                                         className={`w-full px-3 py-2.5 text-sm rounded-xl bg-gray-50 dark:bg-gray-700 border-none focus:ring-2 ${accentClass} text-gray-900 dark:text-white`} />
                                 </div>
                             </div>
@@ -184,11 +204,13 @@ const EditRecordModal = ({ record, type, onClose, onSaved }) => {
                                     onChange={handleChange}
                                     placeholder="Selecciona o escribe una categoría"
                                     required={true}
+                                    ariaLabel="Categoría del gasto"
                                 />
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Monto ($)</label>
                                 <input type="number" step="0.01" min="0" name="monto" value={formData.monto} onChange={handleChange}
+                                    aria-label="Monto del gasto"
                                     className={`w-full px-3 py-2.5 text-sm rounded-xl bg-gray-50 dark:bg-gray-700 border-none focus:ring-2 ${accentClass} text-gray-900 dark:text-white`} />
                             </div>
                             <div>
@@ -200,13 +222,14 @@ const EditRecordModal = ({ record, type, onClose, onSaved }) => {
                                     onChange={handleChange}
                                     placeholder="Ej. Almuerzo negocio"
                                     required={false}
+                                    ariaLabel="Detalle adicional del gasto"
                                 />
                             </div>
                         </>
                     )}
 
                     {error && (
-                        <p className="text-sm text-red-600 dark:text-red-400 font-medium">{error}</p>
+                        <p className="text-sm text-red-600 dark:text-red-400 font-medium" role="alert">{error}</p>
                     )}
                 </div>
 

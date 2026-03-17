@@ -183,6 +183,30 @@ export const GastosList = ({ gastos, onMutate }) => {
     );
 };
 
+// Fix 14: función helper fuera del render en lugar de IIFE dentro del JSX
+const renderSubRows = (item, transactions, filterKey, isIncome, bgAccent, accentColor) => {
+    const related = transactions
+        .filter(t => t[filterKey] === item.name)
+        .sort((a, b) => a.fecha.localeCompare(b.fecha));
+    if (related.length === 0) return null;
+    return related.map((t) => (
+        <tr key={t.id} className={`${bgAccent} border-l-2 ${isIncome ? 'border-green-400' : 'border-red-400'}`}>
+            <td className="pl-6 pr-2 py-2"></td>
+            <td className="px-2 py-2">
+                <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400 w-16 shrink-0">{formatFecha(t.fecha)}</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {isIncome ? `Base: $${t.montoBase?.toFixed(2)}` : (t.detalle || t.categoria)}
+                    </span>
+                </div>
+            </td>
+            <td className={`px-3 py-2 text-xs font-semibold text-right ${accentColor}`}>
+                ${isIncome ? Number(t.ingresoReal || 0).toFixed(2) : Number(t.monto || 0).toFixed(2)}
+            </td>
+        </tr>
+    ));
+};
+
 // ─── AgrupadoList ────────────────────────────────────────────────────────────
 export const AgrupadoList = ({ data, categoryKey, title, isIncome = true, transactions = [], filterKey }) => {
     const [openRow, setOpenRow] = useState(null);
@@ -222,27 +246,7 @@ export const AgrupadoList = ({ data, categoryKey, title, isIncome = true, transa
                                         ${item.total.toFixed(2)}
                                     </td>
                                 </tr>
-                                {openRow === item.name && (() => {
-                                    const related = transactions
-                                        .filter(t => t[filterKey] === item.name)
-                                        .sort((a, b) => a.fecha.localeCompare(b.fecha));
-                                    return related.length === 0 ? null : related.map((t) => (
-                                        <tr key={t.id} className={`${bgAccent} border-l-2 ${isIncome ? 'border-green-400' : 'border-red-400'}`}>
-                                            <td className="pl-6 pr-2 py-2"></td>
-                                            <td className="px-2 py-2">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs text-gray-400 w-16 shrink-0">{formatFecha(t.fecha)}</span>
-                                                    <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                                        {isIncome ? `Base: $${t.montoBase?.toFixed(2)}` : (t.detalle || t.categoria)}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td className={`px-3 py-2 text-xs font-semibold text-right ${accentColor}`}>
-                                                ${isIncome ? Number(t.ingresoReal || 0).toFixed(2) : Number(t.monto || 0).toFixed(2)}
-                                            </td>
-                                        </tr>
-                                    ));
-                                })()}
+                                {openRow === item.name && renderSubRows(item, transactions, filterKey, isIncome, bgAccent, accentColor)}
                             </React.Fragment>
                         ))}
                     </tbody>

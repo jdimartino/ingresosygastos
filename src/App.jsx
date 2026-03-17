@@ -1,13 +1,12 @@
-import React, { Suspense, lazy } from 'react';
+import { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import ReloadPrompt from './components/ReloadPrompt';
+import ErrorBoundary from './components/ErrorBoundary';
 import { TbLoaderQuarter } from 'react-icons/tb';
 
-// Fix #6: Code splitting with React.lazy so Dashboard & Administracion are NOT bundled
-// into the initial JS load. Users who only fill in forms never download this code.
 import NuevoRegistro from './pages/NuevoRegistro';
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Administracion = lazy(() => import('./pages/Administracion'));
@@ -23,34 +22,43 @@ function App() {
   return (
     <AuthProvider>
       <Router>
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
-            <Route path="/" element={<Layout />}>
-              <Route index element={<Navigate to="/registrar" replace />} />
-              <Route path="registrar" element={<NuevoRegistro />} />
-              {/* Legacy redirects */}
-              <Route path="ingreso" element={<Navigate to="/registrar" replace />} />
-              <Route path="gasto" element={<Navigate to="/registrar" replace />} />
+        {/* Fix 8: ErrorBoundary evita que un error en una página rompa toda la app */}
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/" element={<Layout />}>
+                <Route index element={<Navigate to="/registrar" replace />} />
+                <Route path="registrar" element={<NuevoRegistro />} />
+                {/* Legacy redirects */}
+                <Route path="ingreso" element={<Navigate to="/registrar" replace />} />
+                <Route path="gasto" element={<Navigate to="/registrar" replace />} />
 
-              {/* Protected Routes */}
-              <Route path="dashboard" element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="admin" element={
-                <ProtectedRoute>
-                  <Administracion />
-                </ProtectedRoute>
-              } />
-              <Route path="estadisticas" element={
-                <ProtectedRoute>
-                  <Estadisticas />
-                </ProtectedRoute>
-              } />
-            </Route>
-          </Routes>
-        </Suspense>
+                {/* Protected Routes */}
+                <Route path="dashboard" element={
+                  <ProtectedRoute>
+                    <ErrorBoundary>
+                      <Dashboard />
+                    </ErrorBoundary>
+                  </ProtectedRoute>
+                } />
+                <Route path="admin" element={
+                  <ProtectedRoute>
+                    <ErrorBoundary>
+                      <Administracion />
+                    </ErrorBoundary>
+                  </ProtectedRoute>
+                } />
+                <Route path="estadisticas" element={
+                  <ProtectedRoute>
+                    <ErrorBoundary>
+                      <Estadisticas />
+                    </ErrorBoundary>
+                  </ProtectedRoute>
+                } />
+              </Route>
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
       </Router>
       <ReloadPrompt />
     </AuthProvider>
