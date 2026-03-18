@@ -211,7 +211,7 @@ const GastoPanel = () => {
             if (!paralelo) throw new Error('Tasa paralelo no encontrada');
 
             setBinanceRate(paralelo.promedio);
-            setCalcTasa(paralelo.promedio.toString());
+            // No se auto-rellena el campo: el usuario ingresa la tasa manualmente
             setRateLastUpdate(new Date());
         } catch {
             // Fallo silencioso: el usuario puede ingresar la tasa manualmente
@@ -346,9 +346,8 @@ const GastoPanel = () => {
                     <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 space-y-4">
                         <div className="flex items-center justify-between text-xs">
                             <span className="text-gray-500 dark:text-gray-400 flex items-center gap-2">
-                                📡 Tasa Binance: <span className="font-bold text-gray-800 dark:text-gray-200">{rateLoading ? 'Cargando...' : binanceRate ? `${binanceRate} Bs/$` : 'N/A'}</span>
+                                📡 Tasa referencial: <span className="font-bold text-gray-800 dark:text-gray-200">{rateLoading ? 'Cargando...' : binanceRate ? `${binanceRate} Bs/$` : 'N/A'}</span>
                             </span>
-                            {/* Fix 10: rateLastUpdate ya está protegido por el &&, safe */}
                             {rateLastUpdate && (
                                 <span className="text-gray-400">
                                     Actualizado: {format(rateLastUpdate, 'HH:mm:ss')}
