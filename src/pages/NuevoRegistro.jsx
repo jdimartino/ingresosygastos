@@ -1,9 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
-import { collection, addDoc, serverTimestamp, getDocs, query, limit } from 'firebase/firestore';
-import { format } from 'date-fns';
-import { TbBusinessplan, TbFileInvoice, TbCheck, TbCalculator, TbChevronDown, TbChevronUp } from 'react-icons/tb';
+import { collection, addDoc, serverTimestamp, getDocs, query, limit, where } from 'firebase/firestore';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { TbBusinessplan, TbFileInvoice, TbCheck, TbCalculator, TbChevronDown, TbChevronUp, TbPlus } from 'react-icons/tb';
 import AutocompleteInput from '../components/AutocompleteInput';
+import KPICards from '../components/KPICards';
+
+// ── Helper: Fetch totales del mes actual ────────────────────────────────────
+const fetchTotalesMes = async () => {
+    const hoy = new Date();
+    const primerDia = startOfMonth(hoy);
+    const ultimoDia = endOfMonth(hoy);
+
+    try {
+        const [ingresoSnap, gastoSnap] = await Promise.all([
+            getDocs(query(collection(db, 'ingresos'), where('fecha', '>=', format(primerDia, 'yyyy-MM-dd')), where('fecha', '<=', format(ultimoDia, 'yyyy-MM-dd')))),
+            getDocs(query(collection(db, 'gastos'), where('fecha', '>=', format(primerDia, 'yyyy-MM-dd')), where('fecha', '<=', format(ultimoDia, 'yyyy-MM-dd'))))
+        ]);
+
+        const totalIngresos = ingresoSnap.docs.reduce((sum, doc) => sum + (doc.data().ingresoReal || 0), 0);
+        const totalGastos = gastoSnap.docs.reduce((sum, doc) => sum + (doc.data().monto || 0), 0);
+
+        return { totalIngresos, totalGastos };
+    } catch (error) {
+        console.error('Error al obtener totales:', error);
+        return { totalIngresos: 0, totalGastos: 0 };
+    }
+};
 
 // ── Ingreso Form ───────────────────────────────────────────────────────────────
 const IngresoPanel = () => {
@@ -17,6 +40,7 @@ const IngresoPanel = () => {
     const [success, setSuccess] = useState(false);
     const [validationError, setValidationError] = useState('');
     const [clientesTotales, setClientesTotales] = useState([]);
+    const [resumen, setResumen] = useState(null);
 
     useEffect(() => {
         const fetchClientes = async () => {
@@ -73,13 +97,44 @@ const IngresoPanel = () => {
             });
             setSuccess(true);
             setFormData(prev => ({ ...prev, montoBase: '', cliente: '' }));
-            setTimeout(() => setSuccess(false), 3000);
+
+            // Fetch y mostrar totales del mes
+            const totales = await fetchTotalesMes();
+            setResumen(totales);
         } catch {
             setValidationError('Error al guardar el registro. Intenta nuevamente.');
         } finally {
             setLoading(false);
         }
     };
+
+    // Mostrar resumen si existe
+    if (resumen) {
+        return (
+            <div className="space-y-5">
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-100 dark:border-green-800 flex items-center gap-3">
+                    <TbCheck size={24} className="text-green-600 dark:text-green-400" />
+                    <div>
+                        <h3 className="font-semibold text-green-700 dark:text-green-400">¡Ingreso registrado!</h3>
+                        <p className="text-sm text-green-600 dark:text-green-300">Aquí está el resumen de tu mes</p>
+                    </div>
+                </div>
+
+                <KPICards ingresosTotales={resumen.totalIngresos} gastosTotales={resumen.totalGastos} />
+
+                <button
+                    onClick={() => {
+                        setResumen(null);
+                        setFormData(prev => ({ ...prev, fecha: format(new Date(), 'yyyy-MM-dd'), porcentaje: '' }));
+                    }}
+                    className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl shadow-md transition-all flex justify-center items-center gap-2"
+                >
+                    <TbPlus size={20} />
+                    Registrar otro ingreso
+                </button>
+            </div>
+        );
+    }
 
     return (
         <form
@@ -183,6 +238,7 @@ const GastoPanel = () => {
     const [validationError, setValidationError] = useState('');
     const [categorias, setCategorias] = useState([]);
     const [detalles, setDetalles] = useState([]);
+    const [resumen, setResumen] = useState(null);
 
     // Calculator states
     const [showCalc, setShowCalc] = useState(false);
@@ -288,13 +344,44 @@ const GastoPanel = () => {
             });
             setSuccess(true);
             setFormData(prev => ({ ...prev, monto: '', detalle: '' }));
-            setTimeout(() => setSuccess(false), 3000);
+
+            // Fetch y mostrar totales del mes
+            const totales = await fetchTotalesMes();
+            setResumen(totales);
         } catch {
             setValidationError('Error al guardar el registro. Intenta nuevamente.');
         } finally {
             setLoading(false);
         }
     };
+
+    // Mostrar resumen si existe
+    if (resumen) {
+        return (
+            <div className="space-y-5">
+                <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-100 dark:border-red-800 flex items-center gap-3">
+                    <TbCheck size={24} className="text-red-600 dark:text-red-400" />
+                    <div>
+                        <h3 className="font-semibold text-red-700 dark:text-red-400">¡Gasto registrado!</h3>
+                        <p className="text-sm text-red-600 dark:text-red-300">Aquí está el resumen de tu mes</p>
+                    </div>
+                </div>
+
+                <KPICards ingresosTotales={resumen.totalIngresos} gastosTotales={resumen.totalGastos} />
+
+                <button
+                    onClick={() => {
+                        setResumen(null);
+                        setFormData(prev => ({ ...prev, fecha: format(new Date(), 'yyyy-MM-dd') }));
+                    }}
+                    className="w-full mt-6 bg-red-600 hover:bg-red-700 text-white font-semibold py-4 px-6 rounded-xl shadow-md transition-all flex justify-center items-center gap-2"
+                >
+                    <TbPlus size={20} />
+                    Registrar otro gasto
+                </button>
+            </div>
+        );
+    }
 
     return (
         <form
