@@ -120,7 +120,7 @@ const IngresoPanel = () => {
                     </div>
                 </div>
 
-                <KPICards ingresosTotales={resumen.totalIngresos} gastosTotales={resumen.totalGastos} />
+                <KPICards ingresosTotales={resumen.totalIngresos} gastosTotales={resumen.totalGastos} compact={true} />
 
                 <button
                     onClick={() => {
@@ -367,7 +367,7 @@ const GastoPanel = () => {
                     </div>
                 </div>
 
-                <KPICards ingresosTotales={resumen.totalIngresos} gastosTotales={resumen.totalGastos} />
+                <KPICards ingresosTotales={resumen.totalIngresos} gastosTotales={resumen.totalGastos} compact={true} />
 
                 <button
                     onClick={() => {

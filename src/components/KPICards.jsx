@@ -2,9 +2,34 @@ import React from 'react';
 import { TbTrendingUp, TbTrendingDown, TbWallet } from 'react-icons/tb';
 import clsx from 'clsx';
 
-const KPICard = ({ title, amount, type, icon: Icon }) => {
+const KPICard = ({ title, amount, type, icon: Icon, compact = false }) => {
     const isPositive = type === 'income' || (type === 'balance' && amount >= 0);
     const isNegative = type === 'expense' || (type === 'balance' && amount < 0);
+
+    if (compact) {
+        return (
+            <div className="bg-white dark:bg-gray-800 p-3 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center gap-3">
+                <div className={clsx(
+                    "p-2 rounded-lg flex-shrink-0",
+                    isPositive && type !== 'balance' && "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400",
+                    isNegative && type !== 'balance' && "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400",
+                    type === 'balance' && isPositive && "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
+                    type === 'balance' && isNegative && "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400"
+                )}>
+                    <Icon size={20} />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <h3 className="text-xs font-medium text-gray-500 dark:text-gray-400 truncate">{title}</h3>
+                    <p className={clsx(
+                        "text-lg font-bold",
+                        type === 'balance' ? (isPositive ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400') : "text-gray-900 dark:text-white"
+                    )}>
+                        ${amount.toFixed(2)}
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center gap-4">
@@ -30,14 +55,14 @@ const KPICard = ({ title, amount, type, icon: Icon }) => {
     );
 };
 
-const KPICards = ({ ingresosTotales, gastosTotales }) => {
+const KPICards = ({ ingresosTotales, gastosTotales, compact = false }) => {
     const balance = ingresosTotales - gastosTotales;
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <KPICard title="Total Ingresos (Comisión)" amount={ingresosTotales} type="income" icon={TbTrendingUp} />
-            <KPICard title="Total Gastos" amount={gastosTotales} type="expense" icon={TbTrendingDown} />
-            <KPICard title="Balance Neto" amount={balance} type="balance" icon={TbWallet} />
+        <div className={compact ? "space-y-2" : "grid grid-cols-1 md:grid-cols-3 gap-4"}>
+            <KPICard title="Total Ingresos (Comisión)" amount={ingresosTotales} type="income" icon={TbTrendingUp} compact={compact} />
+            <KPICard title="Total Gastos" amount={gastosTotales} type="expense" icon={TbTrendingDown} compact={compact} />
+            <KPICard title="Balance Neto" amount={balance} type="balance" icon={TbWallet} compact={compact} />
         </div>
     );
 };
