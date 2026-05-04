@@ -3,6 +3,7 @@ import { db } from '../firebase/config';
 import { collection, addDoc, serverTimestamp, getDocs, query, limit, where } from 'firebase/firestore';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { TbBusinessplan, TbFileInvoice, TbCheck, TbCalculator, TbChevronDown, TbChevronUp, TbPlus } from 'react-icons/tb';
+import { useAuth } from '../context/AuthContext';
 import AutocompleteInput from '../components/AutocompleteInput';
 import KPICards from '../components/KPICards';
 
@@ -38,6 +39,7 @@ const fetchTotalesMes = async () => {
 
 // ── Ingreso Form ───────────────────────────────────────────────────────────────
 const IngresoPanel = () => {
+    const { user } = useAuth();
     const [formData, setFormData] = useState({
         fecha: format(new Date(), 'yyyy-MM-dd'),
         cliente: '',
@@ -51,6 +53,7 @@ const IngresoPanel = () => {
     const [resumen, setResumen] = useState(null);
 
     useEffect(() => {
+        if (!user) return;  // Esperar a que Firebase Auth restaure la sesión
         const fetchClientes = async () => {
             try {
                 // Fix 9: límite de 200 docs para el autocomplete
@@ -62,7 +65,7 @@ const IngresoPanel = () => {
             }
         };
         fetchClientes();
-    }, []);
+    }, [user]);
 
     const calculateIngresoReal = () => {
         const base = parseFloat(formData.montoBase) || 0;
@@ -235,6 +238,7 @@ const IngresoPanel = () => {
 
 // ── Aporte Fondo Vitalicio Form ───────────────────────────────────────────────
 const AportePanel = () => {
+    const { user } = useAuth();
     const [formData, setFormData] = useState({
         fecha: format(new Date(), 'yyyy-MM-dd'),
         monto: ''
@@ -358,6 +362,7 @@ const AportePanel = () => {
 
 // ── Gasto Form ─────────────────────────────────────────────────────────────────
 const GastoPanel = () => {
+    const { user } = useAuth();
     const [formData, setFormData] = useState({
         fecha: format(new Date(), 'yyyy-MM-dd'),
         categoria: '',
@@ -431,6 +436,7 @@ const GastoPanel = () => {
     };
 
     useEffect(() => {
+        if (!user) return;  // Esperar a que Firebase Auth restaure la sesión
         const fetchData = async () => {
             try {
                 // Fix 9: límite de 200 docs para el autocomplete
@@ -444,7 +450,7 @@ const GastoPanel = () => {
             }
         };
         fetchData();
-    }, []);
+    }, [user]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
