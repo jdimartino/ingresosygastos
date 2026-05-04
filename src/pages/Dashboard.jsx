@@ -52,7 +52,10 @@ const Dashboard = () => {
     const filteredIngresos = useMemo(() => {
         if (!searchQuery.trim()) return ingresos;
         const q = searchQuery.toLowerCase();
-        return ingresos.filter(r => r.cliente?.toLowerCase().includes(q));
+        return ingresos.filter(r =>
+            r.cliente?.toLowerCase().includes(q) ||
+            r.tipo === 'aporte_fondo_vitalicio'
+        );
     }, [ingresos, searchQuery]);
 
     const filteredGastos = useMemo(() => {
@@ -64,12 +67,24 @@ const Dashboard = () => {
         );
     }, [gastos, searchQuery]);
 
+    // Separar comisiones de aportes
+    const comisiones = useMemo(() =>
+        filteredIngresos.filter(i => i.tipo !== 'aporte_fondo_vitalicio'),
+        [filteredIngresos]
+    );
+
+    const aportes = useMemo(() =>
+        filteredIngresos.filter(i => i.tipo === 'aporte_fondo_vitalicio'),
+        [filteredIngresos]
+    );
+
     // Totales y agrupaciones calculadas sobre los arrays filtrados
-    const totalIngresos = filteredIngresos.reduce((sum, item) => sum + (item.ingresoReal || 0), 0);
+    const totalIngresos = comisiones.reduce((sum, item) => sum + (item.ingresoReal || 0), 0);
+    const totalAportes = aportes.reduce((sum, item) => sum + (item.ingresoReal || 0), 0);
     const totalGastos = filteredGastos.reduce((sum, item) => sum + (item.monto || 0), 0);
 
     const agIngresos = useMemo(() => {
-        const grouped = filteredIngresos.reduce((acc, cur) => {
+        const grouped = comisiones.reduce((acc, cur) => {
             const client = cur.cliente || 'Desconocido';
             acc[client] = (acc[client] || 0) + (cur.ingresoReal || 0);
             return acc;
@@ -77,7 +92,7 @@ const Dashboard = () => {
         return Object.entries(grouped)
             .map(([name, total]) => ({ name, total }))
             .sort((a, b) => a.name.localeCompare(b.name));
-    }, [filteredIngresos]);
+    }, [comisiones]);
 
     const agGastos = useMemo(() => {
         const grouped = filteredGastos.reduce((acc, cur) => {
@@ -106,7 +121,7 @@ const Dashboard = () => {
                 </div>
             ) : (
                 <>
-                    <KPICards ingresosTotales={totalIngresos} gastosTotales={totalGastos} />
+                    <KPICards ingresosTotales={totalIngresos} gastosTotales={totalGastos} totalAportes={totalAportes} />
 
                     {/* Barra de búsqueda */}
                     <div className="space-y-2">

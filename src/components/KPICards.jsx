@@ -2,7 +2,7 @@ import React from 'react';
 import { TbTrendingUp, TbTrendingDown, TbWallet } from 'react-icons/tb';
 import clsx from 'clsx';
 
-const KPICard = ({ title, amount, type, icon: Icon, compact = false }) => {
+const KPICard = ({ title, amount, type, icon: Icon, note = null, compact = false }) => {
     const isPositive = type === 'income' || (type === 'balance' && amount >= 0);
     const isNegative = type === 'expense' || (type === 'balance' && amount < 0);
 
@@ -50,17 +50,18 @@ const KPICard = ({ title, amount, type, icon: Icon, compact = false }) => {
                 )}>
                     ${amount.toFixed(2)}
                 </p>
+                {note && <p className="text-xs text-purple-500 dark:text-purple-400 mt-1">{note}</p>}
             </div>
         </div>
     );
 };
 
-const KPICards = ({ ingresosTotales, gastosTotales, compact = false }) => {
-    const balance = ingresosTotales - gastosTotales;
+const KPICards = ({ ingresosTotales, gastosTotales, totalAportes = 0, compact = false }) => {
+    const balance = ingresosTotales + totalAportes - gastosTotales;
 
     return (
         <div className={compact ? "space-y-2" : "grid grid-cols-1 md:grid-cols-3 gap-4"}>
-            <KPICard title="Total Ingresos (Comisión)" amount={ingresosTotales} type="income" icon={TbTrendingUp} compact={compact} />
+            <KPICard title="Total Ingresos (Comisión)" amount={ingresosTotales} type="income" icon={TbTrendingUp} note={totalAportes > 0 ? `+ Aporte FV: $${totalAportes.toFixed(2)}` : null} compact={compact} />
             <KPICard title="Total Gastos" amount={gastosTotales} type="expense" icon={TbTrendingDown} compact={compact} />
             <KPICard title="Balance Neto" amount={balance} type="balance" icon={TbWallet} compact={compact} />
         </div>

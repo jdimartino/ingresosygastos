@@ -18,13 +18,21 @@ const fetchTotalesMes = async () => {
             getDocs(query(collection(db, 'gastos'), where('fecha', '>=', format(primerDia, 'yyyy-MM-dd')), where('fecha', '<=', format(ultimoDia, 'yyyy-MM-dd'))))
         ]);
 
-        const totalIngresos = ingresoSnap.docs.reduce((sum, doc) => sum + (doc.data().ingresoReal || 0), 0);
+        // Separar comisiones de aportes
+        const totalAportes = ingresoSnap.docs
+            .filter(doc => doc.data().tipo === 'aporte_fondo_vitalicio')
+            .reduce((sum, doc) => sum + (doc.data().ingresoReal || 0), 0);
+
+        const totalIngresos = ingresoSnap.docs
+            .filter(doc => doc.data().tipo !== 'aporte_fondo_vitalicio')
+            .reduce((sum, doc) => sum + (doc.data().ingresoReal || 0), 0);
+
         const totalGastos = gastoSnap.docs.reduce((sum, doc) => sum + (doc.data().monto || 0), 0);
 
-        return { totalIngresos, totalGastos };
+        return { totalIngresos, totalGastos, totalAportes };
     } catch (error) {
         console.error('Error al obtener totales:', error);
-        return { totalIngresos: 0, totalGastos: 0 };
+        return { totalIngresos: 0, totalGastos: 0, totalAportes: 0 };
     }
 };
 
@@ -220,6 +228,129 @@ const IngresoPanel = () => {
                 className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl shadow-md disabled:opacity-75 disabled:cursor-not-allowed transition-all flex justify-center items-center gap-2"
             >
                 {loading ? 'Guardando...' : success ? <><TbCheck size={20} /> Guardado Exitosamente</> : 'Registrar Ingreso'}
+            </button>
+        </form>
+    );
+};
+
+// ── Aporte Fondo Vitalicio Form ───────────────────────────────────────────────
+const AportePanel = () => {
+    const [formData, setFormData] = useState({
+        fecha: format(new Date(), 'yyyy-MM-dd'),
+        monto: ''
+    });
+    const [loading, setLoading] = useState(false);
+    const [success, setSuccess] = useState(false);
+    const [validationError, setValidationError] = useState('');
+    const [resumen, setResumen] = useState(null);
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setValidationError('');
+
+        const monto = parseFloat(formData.monto);
+
+        if (!formData.monto) { setValidationError('El Monto es obligatorio.'); return; }
+        if (monto <= 0) { setValidationError('El Monto debe ser mayor a 0.'); return; }
+
+        setLoading(true);
+        setSuccess(false);
+        try {
+            await addDoc(collection(db, 'ingresos'), {
+                fecha: formData.fecha,
+                tipo: 'aporte_fondo_vitalicio',
+                ingresoReal: monto,
+                timestampRegistro: serverTimestamp()
+            });
+            setSuccess(true);
+            setFormData(prev => ({ ...prev, monto: '' }));
+
+            const totales = await fetchTotalesMes();
+            setResumen(totales);
+        } catch {
+            setValidationError('Error al guardar el registro. Intenta nuevamente.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (resumen) {
+        return (
+            <div className="space-y-5">
+                <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-100 dark:border-purple-800 flex items-center gap-3">
+                    <TbCheck size={24} className="text-purple-600 dark:text-purple-400" />
+                    <div>
+                        <h3 className="font-semibold text-purple-700 dark:text-purple-400">¡Aporte registrado!</h3>
+                        <p className="text-sm text-purple-600 dark:text-purple-300">Aquí está el resumen de tu mes</p>
+                    </div>
+                </div>
+
+                <KPICards ingresosTotales={resumen.totalIngresos} gastosTotales={resumen.totalGastos} totalAportes={resumen.totalAportes} compact={true} />
+
+                <button
+                    onClick={() => {
+                        setResumen(null);
+                        setFormData(prev => ({ ...prev, fecha: format(new Date(), 'yyyy-MM-dd') }));
+                    }}
+                    className="w-full mt-6 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-4 px-6 rounded-xl shadow-md transition-all flex justify-center items-center gap-2"
+                >
+                    <TbPlus size={20} />
+                    Registrar otro aporte
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <form
+            onSubmit={handleSubmit}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+            className="space-y-5"
+        >
+            <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fecha</label>
+                <input
+                    type="date"
+                    name="fecha"
+                    value={formData.fecha}
+                    onChange={handleChange}
+                    aria-label="Fecha del aporte"
+                    className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-700 border-none focus:ring-2 focus:ring-purple-500 text-gray-900 dark:text-white"
+                    required
+                />
+            </div>
+
+            <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Monto del Aporte</label>
+                <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    name="monto"
+                    value={formData.monto}
+                    onChange={handleChange}
+                    placeholder="0.00"
+                    aria-label="Monto del aporte fondo vitalicio"
+                    className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-700 border-none focus:ring-2 focus:ring-purple-500 text-gray-900 dark:text-white text-xl font-bold"
+                    required
+                />
+            </div>
+
+            {validationError && (
+                <p className="text-sm text-red-600 dark:text-red-400 font-medium" role="alert">{validationError}</p>
+            )}
+
+            <button
+                type="submit"
+                disabled={loading}
+                className="w-full mt-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-4 px-6 rounded-xl shadow-md disabled:opacity-75 disabled:cursor-not-allowed transition-all flex justify-center items-center gap-2"
+            >
+                {loading ? 'Guardando...' : success ? <><TbCheck size={20} /> Guardado Exitosamente</> : 'Registrar Aporte'}
             </button>
         </form>
     );
@@ -539,6 +670,8 @@ const NuevoRegistro = () => {
     const [activeTab, setActiveTab] = useState('ingreso');
 
     const isIngreso = activeTab === 'ingreso';
+    const isGasto = activeTab === 'gasto';
+    const isAporte = activeTab === 'aporte';
 
     return (
         <div className="max-w-md mx-auto">
@@ -556,13 +689,23 @@ const NuevoRegistro = () => {
                 </button>
                 <button
                     onClick={() => setActiveTab('gasto')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-all duration-200 ${!isIngreso
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-all duration-200 ${isGasto
                         ? 'bg-red-600 text-white shadow-inner'
                         : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
                         }`}
                 >
                     <TbFileInvoice size={18} />
                     Gasto
+                </button>
+                <button
+                    onClick={() => setActiveTab('aporte')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-all duration-200 ${isAporte
+                        ? 'bg-purple-600 text-white shadow-inner'
+                        : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        }`}
+                >
+                    <TbBusinessplan size={18} />
+                    Aporte
                 </button>
             </div>
 
@@ -571,16 +714,20 @@ const NuevoRegistro = () => {
                 <div className="p-6 pb-32">
                     {/* Header */}
                     <div className="flex items-center gap-3 mb-6">
-                        <div className={`p-3 rounded-xl ${isIngreso ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400' : 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400'}`}>
-                            {isIngreso ? <TbBusinessplan size={24} /> : <TbFileInvoice size={24} />}
+                        <div className={`p-3 rounded-xl ${
+                            isIngreso ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400' :
+                            isGasto ? 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400' :
+                            'bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400'
+                        }`}>
+                            {isIngreso ? <TbBusinessplan size={24} /> : isGasto ? <TbFileInvoice size={24} /> : <TbBusinessplan size={24} />}
                         </div>
                         <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-                            {isIngreso ? 'Nuevo Ingreso' : 'Nuevo Gasto'}
+                            {isIngreso ? 'Nuevo Ingreso' : isGasto ? 'Nuevo Gasto' : 'Aporte Fondo Vitalicio'}
                         </h2>
                     </div>
 
                     {/* Active Panel */}
-                    {isIngreso ? <IngresoPanel /> : <GastoPanel />}
+                    {isIngreso ? <IngresoPanel /> : isGasto ? <GastoPanel /> : <AportePanel />}
                 </div>
             </div>
         </div>

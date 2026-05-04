@@ -98,9 +98,19 @@ export const IngresosList = ({ ingresos, onMutate }) => {
                     ) : ingresos.map((item) => (
                         <tr key={item.id} className="group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                             <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">{formatFecha(item.fecha)}</td>
-                            <td className="px-3 py-3 text-sm font-medium text-gray-900 dark:text-white max-w-[100px] truncate" title={item.cliente}>{item.cliente}</td>
+                            <td className="px-3 py-3 text-sm font-medium text-gray-900 dark:text-white max-w-[100px] truncate" title={item.cliente || 'Fondo Vitalicio'}>
+                                {item.tipo === 'aporte_fondo_vitalicio' ? (
+                                    <span className="inline-flex items-center gap-2">
+                                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                                            Fondo Vitalicio
+                                        </span>
+                                    </span>
+                                ) : (
+                                    item.cliente
+                                )}
+                            </td>
                             <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400 text-right">
-                                ${item.montoBase ? item.montoBase.toFixed(2) : '0.00'}
+                                {item.tipo === 'aporte_fondo_vitalicio' ? '—' : `$${item.montoBase ? item.montoBase.toFixed(2) : '0.00'}`}
                             </td>
                             <td className="px-3 py-3 whitespace-nowrap text-sm font-bold text-green-600 dark:text-green-400 text-right">
                                 ${item.ingresoReal ? Number(item.ingresoReal).toFixed(2) : '0.00'}
