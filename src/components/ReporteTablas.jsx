@@ -40,8 +40,8 @@ const TableWrapper = ({ title, children }) => (
 );
 
 // ─── Row action buttons ─────────────────────────────────────────────────────
-const RowActions = ({ onEdit, onDelete }) => (
-    <div className="flex items-center justify-end gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+const RowActions = ({ onEdit, onDelete, alwaysVisible = false }) => (
+    <div className={`flex items-center justify-end gap-1 ${alwaysVisible ? 'opacity-100' : 'opacity-100 sm:opacity-0 sm:group-hover:opacity-100'} transition-opacity`}>
         <button onClick={onEdit} title="Editar"
             className="p-1.5 rounded-lg text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors">
             <TbEdit size={15} />
@@ -130,6 +130,7 @@ export const IngresosList = ({ ingresos, onMutate }) => {
 export const GastosList = ({ gastos, onMutate }) => {
     const [editRecord, setEditRecord] = useState(null);
     const [deleteRecord, setDeleteRecord] = useState(null);
+    const [showBsIndex, setShowBsIndex] = useState(null);
 
     const handleDelete = async () => {
         await deleteDoc(doc(db, 'gastos', deleteRecord.id));
@@ -160,9 +161,9 @@ export const GastosList = ({ gastos, onMutate }) => {
                     <tr>
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Fecha</th>
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">Detalle</th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Detalle</th>
                         <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Monto</th>
-                        <th className="px-3 py-3 w-16"></th>
+                        <th className="px-2 py-3 w-20"></th>
                     </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -176,14 +177,21 @@ export const GastosList = ({ gastos, onMutate }) => {
                                     {item.categoria}
                                 </span>
                             </td>
-                            <td className="px-3 py-3 text-xs text-gray-500 dark:text-gray-400 max-w-[100px] truncate hidden sm:table-cell" title={item.detalle}>
+                            <td className="px-3 py-3 text-xs text-gray-500 dark:text-gray-400 truncate" title={item.detalle}>
                                 {item.detalle || '-'}
                             </td>
-                            <td className="px-3 py-3 whitespace-nowrap text-sm font-bold text-red-600 dark:text-red-400 text-right">
-                                ${item.monto != null ? Number(item.monto).toFixed(2) : '0.00'}
+                            <td
+                                className="px-3 py-3 whitespace-nowrap text-sm font-bold text-red-600 dark:text-red-400 text-right cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => setShowBsIndex(showBsIndex === item.id ? null : item.id)}
+                                title={showBsIndex === item.id ? 'Ver en USD' : item.montoBs != null ? 'Ver en Bs.' : ''}
+                            >
+                                {showBsIndex === item.id && item.montoBs != null
+                                    ? `Bs. ${Number(item.montoBs).toFixed(2)}`
+                                    : `$${Number(item.monto).toFixed(2)}`
+                                }
                             </td>
-                            <td className="px-3 py-3">
-                                <RowActions onEdit={() => setEditRecord(item)} onDelete={() => setDeleteRecord(item)} />
+                            <td className="px-2 py-3">
+                                <RowActions onEdit={() => setEditRecord(item)} onDelete={() => setDeleteRecord(item)} alwaysVisible />
                             </td>
                         </tr>
                     ))}

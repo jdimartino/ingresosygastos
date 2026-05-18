@@ -367,7 +367,8 @@ const GastoPanel = () => {
         fecha: format(new Date(), 'yyyy-MM-dd'),
         categoria: '',
         monto: '',
-        detalle: ''
+        detalle: '',
+        montoBs: null
     });
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
@@ -430,7 +431,7 @@ const GastoPanel = () => {
     const handleUseCalcMonto = () => {
         const res = calcResult();
         if (res !== '0.00') {
-            setFormData(prev => ({ ...prev, monto: res }));
+            setFormData(prev => ({ ...prev, monto: res, montoBs: parseFloat(calcMontoBs) }));
             setShowCalc(false);
         }
     };
@@ -476,11 +477,12 @@ const GastoPanel = () => {
                 fecha: formData.fecha,
                 categoria,                    // Fix 15: trimmed
                 monto,
+                montoBs: formData.montoBs || null,
                 detalle: formData.detalle.trim(), // Fix 15: trimmed
                 timestampRegistro: serverTimestamp()
             });
             setSuccess(true);
-            setFormData(prev => ({ ...prev, monto: '', detalle: '' }));
+            setFormData(prev => ({ ...prev, monto: '', detalle: '', montoBs: null }));
 
             // Fetch y mostrar totales del mes
             const totales = await fetchTotalesMes();

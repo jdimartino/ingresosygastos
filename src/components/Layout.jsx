@@ -18,7 +18,7 @@ const Layout = () => {
     return (
         <div className="min-h-screen flex flex-col items-center bg-gray-50 dark:bg-gray-900 w-full transition-colors duration-200">
             <header className="w-full bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-50">
-                <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between h-16">
                         <div className="flex">
                             <div className="flex-shrink-0 flex items-center">
@@ -71,7 +71,7 @@ const Layout = () => {
             </header>
 
             {/* Main Content Area */}
-            <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-32">
+            <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-32">
                 <Outlet />
             </main>
 

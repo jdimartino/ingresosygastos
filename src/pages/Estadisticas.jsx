@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { format, subMonths, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
+import { format, subMonths, addMonths, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import MonthSelector from '../components/MonthSelector';
 import { es } from 'date-fns/locale';
 import {
@@ -66,22 +66,23 @@ const Estadisticas = () => {
     const [categoryData, setCategoryData] = useState([]);
     const [clientData, setClientData] = useState([]);
     const [kpis, setKpis] = useState({});
-    const [range, setRange] = useState(6); // 6, 12, o 'mes'
+    const [mode, setMode] = useState('mensual'); // 'mensual' | 'periodo'
     const [selectedMonth, setSelectedMonth] = useState(new Date());
+    const [periodoStart, setPeriodoStart] = useState(subMonths(new Date(), 5));
+    const [periodoEnd, setPeriodoEnd] = useState(new Date());
     const [dailyData, setDailyData] = useState([]);
 
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const now = new Date();
                 let start, end;
-                if (range === 'mes') {
+                if (mode === 'mensual') {
                     start = format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
                     end = format(endOfMonth(selectedMonth), 'yyyy-MM-dd') + 'T23:59:59';
                 } else {
-                    start = format(startOfMonth(subMonths(now, range - 1)), 'yyyy-MM-dd');
-                    end = format(endOfMonth(now), 'yyyy-MM-dd') + 'T23:59:59';
+                    start = format(startOfMonth(periodoStart), 'yyyy-MM-dd');
+                    end = format(endOfMonth(periodoEnd), 'yyyy-MM-dd') + 'T23:59:59';
                 }
 
                 // Fix 6: allSettled para que un fallo no anule los dos resultados
@@ -96,7 +97,7 @@ const Estadisticas = () => {
                 let monthly = [];
                 let daily = [];
 
-                if (range === 'mes') {
+                if (mode === 'mensual') {
                     // ── Datos Diarios ──────────────────────────────────────────
                     const days = eachDayOfInterval({
                         start: startOfMonth(selectedMonth),
@@ -117,8 +118,10 @@ const Estadisticas = () => {
                 } else {
                     // ── Datos Mensuales ──────────────────────────────────────────
                     const months = [];
-                    for (let i = range - 1; i >= 0; i--) {
-                        months.push(format(subMonths(now, i), 'yyyy-MM'));
+                    let current = startOfMonth(periodoStart);
+                    while (current <= periodoEnd) {
+                        months.push(format(current, 'yyyy-MM'));
+                        current = addMonths(current, 1);
                     }
 
                     monthly = months.map(ym => {
@@ -163,7 +166,7 @@ const Estadisticas = () => {
                 const totalIng = ingresos.reduce((s, r) => s + (r.ingresoReal || 0), 0);
                 const totalGas = gastos.reduce((s, r) => s + (r.monto || 0), 0);
                 const savingsRate = totalIng > 0 ? ((totalIng - totalGas) / totalIng * 100) : 0;
-                const currentData = range === 'mes' ? daily : monthly;
+                const currentData = mode === 'mensual' ? daily : monthly;
                 const active = currentData.filter(m => m.ing > 0 || m.gas > 0);
                 const avgIng = active.length ? totalIng / active.length : 0;
                 const avgGas = active.length ? totalGas / active.length : 0;
@@ -180,7 +183,7 @@ const Estadisticas = () => {
         };
 
         fetchData();
-    }, [range, selectedMonth]);
+    }, [mode, selectedMonth, periodoStart, periodoEnd]);
 
     if (loading) {
         return (
@@ -206,25 +209,40 @@ const Estadisticas = () => {
                 </div>
                 {/* Selectores */}
                 <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3">
-                    {range === 'mes' && (
-                        <MonthSelector
-                            selectedDate={selectedMonth}
-                            onChangeDate={setSelectedMonth}
-                        />
+                    {mode === 'mensual' ? (
+                        <MonthSelector selectedDate={selectedMonth} onChangeDate={setSelectedMonth} />
+                    ) : (
+                        <div className="flex items-center gap-2">
+                            <div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Desde</p>
+                                <MonthSelector selectedDate={periodoStart} onChangeDate={setPeriodoStart} />
+                            </div>
+                            <span className="text-gray-400 mt-6 text-lg">→</span>
+                            <div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Hasta</p>
+                                <MonthSelector selectedDate={periodoEnd} onChangeDate={setPeriodoEnd} />
+                            </div>
+                        </div>
                     )}
                     <div className="flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm text-sm font-semibold">
-                        {[6, 12, 'mes'].map(r => (
-                            <button
-                                key={r}
-                                onClick={() => setRange(r)}
-                                className={`px-5 py-2 transition-all ${range === r
-                                        ? 'bg-blue-600 text-white'
-                                        : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                                    }`}
-                            >
-                                {r === 'mes' ? 'Mensual' : `${r} meses`}
-                            </button>
-                        ))}
+                        <button
+                            onClick={() => setMode('mensual')}
+                            className={`px-5 py-2 transition-all ${mode === 'mensual'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            }`}
+                        >
+                            Mensual
+                        </button>
+                        <button
+                            onClick={() => setMode('periodo')}
+                            className={`px-5 py-2 transition-all ${mode === 'periodo'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            }`}
+                        >
+                            Período
+                        </button>
                     </div>
                 </div>
             </div>
@@ -243,21 +261,21 @@ const Estadisticas = () => {
                     }
                 />
                 <StatCard
-                    title={range === 'mes' ? "Promedio Ingreso/día" : "Promedio Ingreso/mes"}
+                    title={mode === 'mensual' ? "Promedio Ingreso/día" : "Promedio Ingreso/mes"}
                     value={`$${kpis.avgIng?.toFixed(2)}`}
-                    subtitle={range === 'mes' ? 'en el mes' : `últimos ${range} meses`}
+                    subtitle={mode === 'mensual' ? 'en el mes' : 'en el período'}
                     icon={TbTrendingUp}
                     colorClass="bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
                 />
                 <StatCard
-                    title={range === 'mes' ? "Promedio Gasto/día" : "Promedio Gasto/mes"}
+                    title={mode === 'mensual' ? "Promedio Gasto/día" : "Promedio Gasto/mes"}
                     value={`$${kpis.avgGas?.toFixed(2)}`}
-                    subtitle={range === 'mes' ? 'en el mes' : `últimos ${range} meses`}
+                    subtitle={mode === 'mensual' ? 'en el mes' : 'en el período'}
                     icon={TbTrendingDown}
                     colorClass="bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
                 />
                 <StatCard
-                    title={range === 'mes' ? "Mejor Día" : "Mejor Mes"}
+                    title={mode === 'mensual' ? "Mejor Día" : "Mejor Mes"}
                     value={kpis.bestMonth ? `$${kpis.bestMonth.bal.toFixed(2)}` : '--'}
                     subtitle={kpis.bestMonth?.label || 'sin datos'}
                     icon={TbStar}
@@ -267,11 +285,11 @@ const Estadisticas = () => {
 
             {/* ── Barra: Ingresos vs Gastos ────────────────────────────────── */}
             <Section
-                title={range === 'mes' ? "Ingresos vs Gastos por Día" : "Ingresos vs Gastos por Mes"}
-                subtitle={range === 'mes' ? "Comparativa diaria en USD" : "Comparativa mensual en USD"}
+                title={mode === 'mensual' ? "Ingresos vs Gastos por Día" : "Ingresos vs Gastos por Mes"}
+                subtitle={mode === 'mensual' ? "Comparativa diaria en USD" : "Comparativa mensual en USD"}
             >
                 <ResponsiveContainer width="100%" height={260}>
-                    <BarChart data={range === 'mes' ? dailyData : monthlyData} margin={{ top: 4, right: 10, left: 0, bottom: 4 }}>
+                    <BarChart data={mode === 'mensual' ? dailyData : monthlyData} margin={{ top: 4, right: 10, left: 0, bottom: 4 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:stroke-gray-700" />
                         <XAxis
                             dataKey="label"
@@ -294,10 +312,10 @@ const Estadisticas = () => {
             {/* ── Área: Balance Neto ───────────────────────────────────────── */}
             <Section
                 title="Evolución del Balance Neto"
-                subtitle={range === 'mes' ? "Ingresos − Gastos diarios" : "Ingresos − Gastos cada mes"}
+                subtitle={mode === 'mensual' ? "Ingresos − Gastos diarios" : "Ingresos − Gastos cada mes"}
             >
                 <ResponsiveContainer width="100%" height={220}>
-                    <AreaChart data={range === 'mes' ? dailyData : monthlyData} margin={{ top: 4, right: 10, left: 0, bottom: 4 }}>
+                    <AreaChart data={mode === 'mensual' ? dailyData : monthlyData} margin={{ top: 4, right: 10, left: 0, bottom: 4 }}>
                         <defs>
                             <linearGradient id="gradBal" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.35} />

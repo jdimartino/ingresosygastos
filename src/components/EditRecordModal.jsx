@@ -25,6 +25,7 @@ const EditRecordModal = ({ record, type, onClose, onSaved }) => {
         categoria: record.categoria || '',
         monto: record.monto || '',
         detalle: record.detalle || '',
+        montoBs: record.montoBs || '',
     }));
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
@@ -112,6 +113,7 @@ const EditRecordModal = ({ record, type, onClose, onSaved }) => {
                     fecha: formData.fecha,
                     categoria: formData.categoria.trim(),      // Fix 15: trimmed
                     monto: parseFloat(formData.monto),
+                    montoBs: formData.montoBs ? parseFloat(formData.montoBs) : null,
                     detalle: formData.detalle.trim(),          // Fix 15: trimmed
                     timestampModificado: serverTimestamp(),
                 };
@@ -207,11 +209,19 @@ const EditRecordModal = ({ record, type, onClose, onSaved }) => {
                                     ariaLabel="Categoría del gasto"
                                 />
                             </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Monto ($)</label>
-                                <input type="number" step="0.01" min="0" name="monto" value={formData.monto} onChange={handleChange}
-                                    aria-label="Monto del gasto"
-                                    className={`w-full px-3 py-2.5 text-sm rounded-xl bg-gray-50 dark:bg-gray-700 border-none focus:ring-2 ${accentClass} text-gray-900 dark:text-white`} />
+                            <div className="flex gap-2">
+                                <div className="flex-1">
+                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Monto ($)</label>
+                                    <input type="number" step="0.01" min="0" name="monto" value={formData.monto} onChange={handleChange}
+                                        aria-label="Monto del gasto"
+                                        className={`w-full px-3 py-2.5 text-sm rounded-xl bg-gray-50 dark:bg-gray-700 border-none focus:ring-2 ${accentClass} text-gray-900 dark:text-white`} />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Monto (Bs.)</label>
+                                    <input type="number" step="0.01" min="0" name="montoBs" value={formData.montoBs || ''} onChange={handleChange}
+                                        aria-label="Monto del gasto en bolívares"
+                                        className={`w-full px-3 py-2.5 text-sm rounded-xl bg-gray-50 dark:bg-gray-700 border-none focus:ring-2 ${accentClass} text-gray-900 dark:text-white`} />
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Detalle (Opcional)</label>
