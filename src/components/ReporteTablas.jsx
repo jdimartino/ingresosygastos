@@ -130,7 +130,7 @@ export const IngresosList = ({ ingresos, onMutate }) => {
 export const GastosList = ({ gastos, onMutate }) => {
     const [editRecord, setEditRecord] = useState(null);
     const [deleteRecord, setDeleteRecord] = useState(null);
-    const [showBsIndex, setShowBsIndex] = useState(null);
+    const [showBsMode, setShowBsMode] = useState(false);
 
     const handleDelete = async () => {
         await deleteDoc(doc(db, 'gastos', deleteRecord.id));
@@ -182,11 +182,17 @@ export const GastosList = ({ gastos, onMutate }) => {
                             </td>
                             <td
                                 className="px-3 py-3 whitespace-nowrap text-sm font-bold text-red-600 dark:text-red-400 text-right cursor-pointer hover:opacity-80 transition-opacity"
-                                onClick={() => setShowBsIndex(showBsIndex === item.id ? null : item.id)}
-                                title={showBsIndex === item.id ? 'Ver en USD' : item.montoBs != null ? 'Ver en Bs.' : ''}
+                                onClick={() => { if (item.montoBs != null) setShowBsMode(prev => !prev); }}
+                                title={
+                                    item.montoBs == null
+                                        ? ''
+                                        : showBsMode
+                                            ? 'Ver en USD'
+                                            : 'Ver en Bs.'
+                                }
                             >
-                                {showBsIndex === item.id && item.montoBs != null
-                                    ? `Bs. ${Number(item.montoBs).toFixed(2)}`
+                                {showBsMode && item.montoBs != null
+                                    ? `Bs. ${Number(item.montoBs).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                                     : `$${Number(item.monto).toFixed(2)}`
                                 }
                             </td>
