@@ -28,3 +28,7 @@ history/
 # Environment variables
 .env
 
+
+# Firebase hosting cache
+.firebase/
+firebase-debug.log
