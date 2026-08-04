@@ -182,18 +182,22 @@ export const GastosList = ({ gastos, onMutate }) => {
                             </td>
                             <td
                                 className="px-3 py-3 whitespace-nowrap text-sm font-bold text-red-600 dark:text-red-400 text-right cursor-pointer hover:opacity-80 transition-opacity"
-                                onClick={() => { if (item.montoBs != null) setShowBsMode(prev => !prev); }}
+                                onClick={() => { if (item.montoBs != null || item.montoCop != null) setShowBsMode(prev => !prev); }}
                                 title={
-                                    item.montoBs == null
-                                        ? ''
-                                        : showBsMode
-                                            ? 'Ver en USD'
-                                            : 'Ver en Bs.'
+                                    item.montoCop != null
+                                        ? (showBsMode ? 'Ver en USD' : 'Ver en COP')
+                                        : item.montoBs == null
+                                            ? ''
+                                            : showBsMode
+                                                ? 'Ver en USD'
+                                                : 'Ver en Bs.'
                                 }
                             >
-                                {showBsMode && item.montoBs != null
-                                    ? `Bs. ${Number(item.montoBs).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                                    : `$${Number(item.monto).toFixed(2)}`
+                                {showBsMode && item.montoCop != null
+                                    ? `COP ${Number(item.montoCop).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                                    : showBsMode && item.montoBs != null
+                                        ? `Bs. ${Number(item.montoBs).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                        : `$${Number(item.monto).toFixed(2)}`
                                 }
                             </td>
                             <td className="px-2 py-3">

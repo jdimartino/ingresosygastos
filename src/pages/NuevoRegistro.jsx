@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { db } from '../firebase/config';
 import { collection, addDoc, serverTimestamp, getDocs, query, limit, where } from 'firebase/firestore';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
@@ -361,14 +361,28 @@ const AportePanel = () => {
 };
 
 // ── Gasto Form ─────────────────────────────────────────────────────────────────
+// ── Gasto Form ─────────────────────────────────────────────────────────────────
 const GastoPanel = () => {
     const { user } = useAuth();
+    
+    // Check if Colombia Mode is selected
+    const [currency, setCurrency] = useState(() => {
+        try {
+            return localStorage.getItem('gastoCurrency') || 'VES';
+        } catch {
+            return 'VES';
+        }
+    });
+
+    const modoColombia = currency === 'COP';
+
     const [formData, setFormData] = useState({
         fecha: format(new Date(), 'yyyy-MM-dd'),
         categoria: '',
         monto: '',
         detalle: '',
-        montoBs: null
+        montoBs: null,
+        montoCop: null
     });
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
@@ -378,52 +392,71 @@ const GastoPanel = () => {
     const [resumen, setResumen] = useState(null);
 
     // Calculator states
-    const [showCalc, setShowCalc] = useState(false);
-    const [calcMontoBs, setCalcMontoBs] = useState('');
+    const [calcMontoLocal, setCalcMontoLocal] = useState('');
     const [calcTasa, setCalcTasa] = useState('');
-    const [binanceRate, setBinanceRate] = useState(null);
+    const [apiRate, setApiRate] = useState(null);
     const [rateLoading, setRateLoading] = useState(false);
     const [rateLastUpdate, setRateLastUpdate] = useState(null);
 
-    // Fix 2: API externa con timeout de 8s y validación de respuesta
-    const fetchBinanceRate = async () => {
+    // Fetch Rate depending on selected currency
+    const fetchExchangeRate = useCallback(async (selectedCurr) => {
         setRateLoading(true);
+        setApiRate(null);
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-            const res = await fetch('https://ve.dolarapi.com/v1/dolares', { signal: controller.signal });
-            clearTimeout(timeoutId);
-
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-            const data = await res.json();
-            if (!Array.isArray(data)) throw new Error('Formato de respuesta inválido');
-
-            const paralelo = data.find(item => item?.fuente === 'paralelo' && item?.promedio);
-            if (!paralelo) throw new Error('Tasa paralelo no encontrada');
-
-            setBinanceRate(paralelo.promedio);
-            // No se auto-rellena el campo: el usuario ingresa la tasa manualmente
-            setRateLastUpdate(new Date());
-        } catch {
-            // Fallo silencioso: el usuario puede ingresar la tasa manualmente
+            if (selectedCurr === 'COP') {
+                // Colombia API
+                const res = await fetch('https://co.dolarapi.com/v1/trm', { signal: controller.signal });
+                clearTimeout(timeoutId);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                if (data && data.valor) {
+                    setApiRate(data.valor);
+                    setCalcTasa(data.valor.toString()); // Auto-fill rate for Colombia
+                    setRateLastUpdate(new Date());
+                }
+            } else {
+                // Venezuela API
+                const res = await fetch('https://ve.dolarapi.com/v1/dolares', { signal: controller.signal });
+                clearTimeout(timeoutId);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                if (!Array.isArray(data)) throw new Error('Formato inválido');
+                const paralelo = data.find(item => item?.fuente === 'paralelo' && item?.promedio);
+                if (!paralelo) throw new Error('No paralelos');
+                setApiRate(paralelo.promedio);
+                setCalcTasa(''); // VES typically manual input, leave blank for manual override
+                setRateLastUpdate(new Date());
+            }
+        } catch (e) {
+            console.warn('Silent rate fetch failed:', e);
         } finally {
             setRateLoading(false);
         }
+    }, []);
+
+    // Fetch rate on mount or when currency changes
+    useEffect(() => {
+        fetchExchangeRate(currency);
+    }, [currency, fetchExchangeRate]);
+
+    const handleCurrencyChange = (newCurr) => {
+        setCurrency(newCurr);
+        try {
+            localStorage.setItem('gastoCurrency', newCurr);
+        } catch { /* noop */ }
+        setCalcMontoLocal('');
+        setCalcTasa('');
+        setFormData(prev => ({ ...prev, montoBs: null, montoCop: null }));
     };
 
-    useEffect(() => {
-        if (showCalc && !binanceRate) {
-            fetchBinanceRate();
-        }
-    }, [showCalc]);
-
     const calcResult = () => {
-        const bs = parseFloat(calcMontoBs);
+        const localVal = parseFloat(calcMontoLocal);
         const tasa = parseFloat(calcTasa);
-        if (bs > 0 && tasa > 0) {
-            return (bs / tasa).toFixed(2);
+        if (localVal > 0 && tasa > 0) {
+            return (localVal / tasa).toFixed(2);
         }
         return '0.00';
     };
@@ -431,23 +464,39 @@ const GastoPanel = () => {
     const handleUseCalcMonto = () => {
         const res = calcResult();
         if (res !== '0.00') {
-            setFormData(prev => ({ ...prev, monto: res, montoBs: parseFloat(calcMontoBs) }));
-            setShowCalc(false);
+            if (modoColombia) {
+                setFormData(prev => ({ ...prev, monto: res, montoCop: parseFloat(calcMontoLocal), montoBs: null }));
+            } else {
+                setFormData(prev => ({ ...prev, monto: res, montoBs: parseFloat(calcMontoLocal), montoCop: null }));
+            }
         }
     };
 
+    // Auto-apply result when calcResult changes to avoid manual "Usar monto" step for maximum speed
     useEffect(() => {
-        if (!user) return;  // Esperar a que Firebase Auth restaure la sesión
+        const res = calcResult();
+        if (res !== '0.00') {
+            if (modoColombia) {
+                setFormData(prev => ({ ...prev, monto: res, montoCop: parseFloat(calcMontoLocal), montoBs: null }));
+            } else {
+                setFormData(prev => ({ ...prev, monto: res, montoBs: parseFloat(calcMontoLocal), montoCop: null }));
+            }
+        } else {
+            setFormData(prev => ({ ...prev, monto: '' }));
+        }
+    }, [calcMontoLocal, calcTasa, modoColombia]);
+
+    useEffect(() => {
+        if (!user) return;
         const fetchData = async () => {
             try {
-                // Fix 9: límite de 200 docs para el autocomplete
                 const querySnapshot = await getDocs(query(collection(db, 'gastos'), limit(200)));
                 const cats = querySnapshot.docs.map(doc => doc.data().categoria);
                 const dets = querySnapshot.docs.map(doc => doc.data().detalle);
                 setCategorias([...new Set(cats)].filter(Boolean).sort());
                 setDetalles([...new Set(dets)].filter(Boolean).sort());
             } catch {
-                // Fallo silencioso: el autocomplete simplemente no muestra sugerencias
+                // Silent catch
             }
         };
         fetchData();
@@ -462,7 +511,6 @@ const GastoPanel = () => {
         e.preventDefault();
         setValidationError('');
 
-        // Fix 7: Feedback claro en validación
         const categoria = formData.categoria.trim();
         const monto = parseFloat(formData.monto);
 
@@ -475,16 +523,17 @@ const GastoPanel = () => {
         try {
             await addDoc(collection(db, 'gastos'), {
                 fecha: formData.fecha,
-                categoria,                    // Fix 15: trimmed
+                categoria,
                 monto,
-                montoBs: formData.montoBs || null,
-                detalle: formData.detalle.trim(), // Fix 15: trimmed
+                montoBs: modoColombia ? null : (formData.montoBs || null),
+                montoCop: modoColombia ? (formData.montoCop || null) : null,
+                detalle: formData.detalle.trim(),
                 timestampRegistro: serverTimestamp()
             });
             setSuccess(true);
-            setFormData(prev => ({ ...prev, monto: '', detalle: '', montoBs: null }));
+            setFormData(prev => ({ ...prev, monto: '', detalle: '', montoBs: null, montoCop: null }));
+            setCalcMontoLocal('');
 
-            // Fetch y mostrar totales del mes
             const totales = await fetchTotalesMes();
             setResumen(totales);
         } catch {
@@ -494,10 +543,9 @@ const GastoPanel = () => {
         }
     };
 
-    // Mostrar resumen si existe
     if (resumen) {
         return (
-            <div className="space-y-5">
+            <div className="space-y-4">
                 <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-100 dark:border-red-800 flex items-center gap-3">
                     <TbCheck size={24} className="text-red-600 dark:text-red-400" />
                     <div>
@@ -513,7 +561,7 @@ const GastoPanel = () => {
                         setResumen(null);
                         setFormData(prev => ({ ...prev, fecha: format(new Date(), 'yyyy-MM-dd') }));
                     }}
-                    className="w-full mt-6 bg-red-600 hover:bg-red-700 text-white font-semibold py-4 px-6 rounded-xl shadow-md transition-all flex justify-center items-center gap-2"
+                    className="w-full mt-4 bg-red-600 hover:bg-red-700 text-white font-semibold py-3.5 px-6 rounded-xl shadow-md transition-all flex justify-center items-center gap-2"
                 >
                     <TbPlus size={20} />
                     Registrar otro gasto
@@ -526,138 +574,164 @@ const GastoPanel = () => {
         <form
             onSubmit={handleSubmit}
             onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
-            className="space-y-5"
+            className="space-y-4"
         >
-            <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fecha</label>
-                <input
-                    type="date"
-                    name="fecha"
-                    value={formData.fecha}
-                    onChange={handleChange}
-                    aria-label="Fecha del gasto"
-                    className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-700 border-none focus:ring-2 focus:ring-red-500 text-gray-900 dark:text-white"
-                    required
-                />
+            {/* Grid 1: Fecha y Categoría */}
+            <div className="grid grid-cols-2 gap-3">
+                <div>
+                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Fecha</label>
+                    <input
+                        type="date"
+                        name="fecha"
+                        value={formData.fecha}
+                        onChange={handleChange}
+                        aria-label="Fecha del gasto"
+                        className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-700 border-none focus:ring-2 focus:ring-red-500 text-sm text-gray-900 dark:text-white"
+                        required
+                    />
+                </div>
+                <div>
+                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Categoría</label>
+                    <AutocompleteInput
+                        name="categoria"
+                        value={formData.categoria}
+                        options={categorias}
+                        onChange={handleChange}
+                        placeholder="Categoría"
+                        required={true}
+                        ariaLabel="Categoría del gasto"
+                    />
+                </div>
             </div>
 
-            <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoría / Descripción</label>
-                <AutocompleteInput
-                    name="categoria"
-                    value={formData.categoria}
-                    options={categorias}
-                    onChange={handleChange}
-                    placeholder="Selecciona o escribe una categoría"
-                    required={true}
-                    ariaLabel="Categoría del gasto"
-                />
-            </div>
+            {/* Conversor Integrado Siempre Visible */}
+            <div className={`p-4 rounded-xl border transition-all ${
+                modoColombia 
+                    ? 'bg-yellow-50/20 border-yellow-200 dark:border-yellow-900/40 dark:bg-yellow-950/5' 
+                    : 'bg-blue-50/10 border-blue-100 dark:border-blue-900/20 dark:bg-blue-950/5'
+            }`}>
+                {/* Header Conversor: Title + Selector Segmentado */}
+                <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-bold text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
+                        <TbCalculator size={16} className={modoColombia ? "text-amber-500" : "text-blue-500"} />
+                        Conversión de Moneda
+                    </span>
 
-            {/* Calculadora VES -> USD */}
-            <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden mb-5">
-                <button
-                    type="button"
-                    onClick={() => setShowCalc(!showCalc)}
-                    className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
-                >
-                    <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        <TbCalculator size={18} className="text-blue-500" />
-                        Calculadora VES → USD
+                    {/* Selector de moneda integrado */}
+                    <div className="flex bg-gray-100 dark:bg-gray-800 p-0.5 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <button
+                            type="button"
+                            onClick={() => handleCurrencyChange('VES')}
+                            className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all flex items-center gap-1 ${
+                                !modoColombia
+                                    ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-300'
+                            }`}
+                        >
+                            <span>🇻🇪</span> VES
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleCurrencyChange('COP')}
+                            className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all flex items-center gap-1 ${
+                                modoColombia
+                                    ? 'bg-white dark:bg-gray-700 text-amber-600 dark:text-amber-400 shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-300'
+                            }`}
+                        >
+                            <span>🇨🇴</span> COP
+                        </button>
                     </div>
-                    {showCalc ? <TbChevronUp size={18} className="text-gray-400" /> : <TbChevronDown size={18} className="text-gray-400" />}
-                </button>
+                </div>
 
-                {showCalc && (
-                    <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 space-y-4">
-                        <div className="flex items-center justify-between text-xs">
-                            <span className="text-gray-500 dark:text-gray-400 flex items-center gap-2">
-                                📡 Tasa referencial: <span className="font-bold text-gray-800 dark:text-gray-200">{rateLoading ? 'Cargando...' : binanceRate ? `${binanceRate} Bs/$` : 'N/A'}</span>
-                            </span>
-                            {rateLastUpdate && (
-                                <span className="text-gray-400">
-                                    Actualizado: {format(rateLastUpdate, 'HH:mm:ss')}
-                                </span>
-                            )}
-                        </div>
+                {/* Subinfo de tasa */}
+                <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400 mb-3 border-b border-gray-100 dark:border-gray-800 pb-2">
+                    <span>
+                        📡 {modoColombia ? 'Tasa TRM:' : 'Tasa Paralelo:'}{' '}
+                        <strong className="text-gray-700 dark:text-gray-300">
+                            {rateLoading 
+                                ? 'Cargando...' 
+                                : apiRate 
+                                    ? `${apiRate} ${modoColombia ? 'COP' : 'Bs'}/$` 
+                                    : 'N/A'
+                            }
+                        </strong>
+                    </span>
+                    {rateLastUpdate && (
+                        <span className="opacity-80">
+                            Act: {format(rateLastUpdate, 'HH:mm:ss')}
+                        </span>
+                    )}
+                </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Monto en Bs</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={calcMontoBs}
-                                    onChange={(e) => setCalcMontoBs(e.target.value)}
-                                    placeholder="0.00"
-                                    aria-label="Monto en bolívares"
-                                    className="w-full px-3 py-2 text-sm rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Tasa VES/USD</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={calcTasa}
-                                    onChange={(e) => setCalcTasa(e.target.value)}
-                                    placeholder="0.00"
-                                    aria-label="Tasa de cambio VES por USD"
-                                    className="w-full px-3 py-2 text-sm rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800/30">
-                            <div>
-                                <span className="text-xs text-blue-600 dark:text-blue-400 block mb-1">Resultado</span>
-                                <span className="text-lg font-bold text-blue-700 dark:text-blue-300">$ {calcResult()} Ref.</span>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={handleUseCalcMonto}
-                                disabled={calcResult() === '0.00'}
-                                className="px-3 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50 transition-colors"
-                            >
-                                Usar monto →
-                            </button>
-                        </div>
+                {/* Grid Inputs Calculadora */}
+                <div className="grid grid-cols-2 gap-3">
+                    <div>
+                        <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                            {modoColombia ? 'Monto en COP' : 'Monto en Bs'}
+                        </label>
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={calcMontoLocal}
+                            onChange={(e) => setCalcMontoLocal(e.target.value)}
+                            placeholder="0.00"
+                            aria-label={modoColombia ? 'Monto en pesos colombianos' : 'Monto en bolívares'}
+                            className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:ring-1 focus:ring-red-500 text-gray-900 dark:text-white"
+                        />
                     </div>
-                )}
+                    <div>
+                        <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                            Tasa de Cambio
+                        </label>
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={calcTasa}
+                            onChange={(e) => setCalcTasa(e.target.value)}
+                            placeholder="0.00"
+                            aria-label="Tasa de cambio por USD"
+                            className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:ring-1 focus:ring-red-500 text-gray-900 dark:text-white"
+                        />
+                    </div>
+                </div>
             </div>
 
-            <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Monto del Gasto</label>
-                <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    name="monto"
-                    value={formData.monto}
-                    onChange={handleChange}
-                    placeholder="0.00"
-                    aria-label="Monto del gasto en USD"
-                    className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-700 border-none focus:ring-2 focus:ring-red-500 text-gray-900 dark:text-white text-xl font-bold"
-                    required
-                />
+            {/* Grid 2: Monto USD y Detalle */}
+            <div className="grid grid-cols-2 gap-3">
+                <div>
+                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                        Monto del Gasto (USD)
+                    </label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        name="monto"
+                        value={formData.monto}
+                        onChange={handleChange}
+                        placeholder="0.00"
+                        aria-label="Monto del gasto en USD"
+                        className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-700 border-none focus:ring-2 focus:ring-red-500 text-base font-bold text-gray-900 dark:text-white"
+                        required
+                    />
+                </div>
+                <div>
+                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Detalle Adicional</label>
+                    <AutocompleteInput
+                        name="detalle"
+                        value={formData.detalle}
+                        options={detalles}
+                        onChange={handleChange}
+                        placeholder="Detalle (opcional)"
+                        required={false}
+                        ariaLabel="Detalle adicional del gasto"
+                    />
+                </div>
             </div>
 
-            <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Detalle Adicional (Opcional)</label>
-                <AutocompleteInput
-                    name="detalle"
-                    value={formData.detalle}
-                    options={detalles}
-                    onChange={handleChange}
-                    placeholder="Ej. Almuerzo negocio"
-                    required={false}
-                    ariaLabel="Detalle adicional del gasto"
-                />
-            </div>
-
-            {/* Fix 7: Mensaje de error visible */}
             {validationError && (
                 <p className="text-sm text-red-600 dark:text-red-400 font-medium" role="alert">{validationError}</p>
             )}
@@ -665,7 +739,7 @@ const GastoPanel = () => {
             <button
                 type="submit"
                 disabled={loading}
-                className="w-full mt-6 bg-red-600 hover:bg-red-700 text-white font-semibold py-4 px-6 rounded-xl shadow-md disabled:opacity-75 disabled:cursor-not-allowed transition-all flex justify-center items-center gap-2"
+                className="w-full mt-2 bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-xl shadow-md disabled:opacity-75 disabled:cursor-not-allowed transition-all flex justify-center items-center gap-2"
             >
                 {loading ? 'Guardando...' : success ? <><TbCheck size={20} /> Guardado Exitosamente</> : 'Registrar Gasto'}
             </button>

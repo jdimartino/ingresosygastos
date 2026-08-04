@@ -1,7 +1,6 @@
 import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-// wait, we need to import icons from react-icons, fixing it below
 import { TbPencilPlus, TbReportMoney, TbLogout, TbLogin, TbSettings, TbChartBar } from "react-icons/tb";
 
 const Layout = () => {
@@ -21,7 +20,7 @@ const Layout = () => {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between h-16">
                         <div className="flex">
-                            <div className="flex-shrink-0 flex items-center">
+                            <div className="flex-shrink-0 flex items-center gap-3">
                                 <Link to="/" className="text-xl font-bold text-primary dark:text-blue-400 flex items-center gap-2">
                                     <TbReportMoney className="text-2xl" /> IngresosYGastos
                                 </Link>
