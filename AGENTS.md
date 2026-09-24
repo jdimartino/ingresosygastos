@@ -14,5 +14,8 @@ esta carpeta (`firestore.rules` + `firestore.indexes.json`, referenciados en
 y no corras deploys de Firestore desde `USDT/` ni desde `paypal/` — mismo
 patrón que las 4 apps de tenis (torneo-colores manda).
 
-Los proyectos viejos `saldo-app-452d6` y `conciliador-pro-cloud` quedaron como
-backup de los datos originales: no desplegarles ni migrarles datos nuevos.
+Los proyectos viejos `saldo-app-452d6` y `conciliador-pro-cloud` fueron
+eliminados el 2026-09-24, recuperables hasta ~2026-10-24 vía
+`gcloud projects undelete <id>` si hiciera falta; después de esa fecha,
+borrado permanente. Los datos ya están migrados y verificados en
+`ingresos-gastos-pwa-2026`.

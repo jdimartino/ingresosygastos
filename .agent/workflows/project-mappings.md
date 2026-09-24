@@ -15,7 +15,9 @@ Este documento define la relación oficial entre las carpetas locales y los proy
 > separados. **Las reglas y los índices de Firestore se centralizan y despliegan SOLO desde esta carpeta**
 > (`firestore.rules` + `firestore.indexes.json`) — mismo patrón que las 4 apps de tenis.
 > NO agregues la sección `firestore` al `firebase.json` de `USDT` ni de `paypal`.
-> Los proyectos viejos `saldo-app-452d6` y `conciliador-pro-cloud` quedan solo como **backup**: no desplegarles.
+> Los proyectos viejos `saldo-app-452d6` y `conciliador-pro-cloud` fueron eliminados el 2026-09-24,
+> recuperables hasta ~2026-10-24 vía `gcloud projects undelete <id>` si hiciera falta; después de esa
+> fecha, borrado permanente. Los datos ya están migrados y verificados en `ingresos-gastos-pwa-2026`.
 
 ---
 
