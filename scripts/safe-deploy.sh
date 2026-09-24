@@ -5,10 +5,13 @@
 CURRENT_DIR=$(basename "$PWD")
 EXPECTED_PROJECT=""
 
-if [ "$CURRENT_DIR" == "IngresosYGastos" ]; then
+# IngresosYGastos, USDT y paypal comparten el proyecto ingresos-gastos-pwa-2026.
+# Cada carpeta tiene su sitio de Hosting en firebase.json (ingresos-gastos-pwa-2026,
+# saldo-app-jdm, conciliador-jdm). Las reglas e índices se despliegan SOLO desde
+# IngresosYGastos/. Los proyectos viejos (saldo-app-452d6, conciliador-pro-cloud)
+# quedaron como backup: NO desplegarles.
+if [ "$CURRENT_DIR" == "IngresosYGastos" ] || [ "$CURRENT_DIR" == "USDT" ] || [ "$CURRENT_DIR" == "paypal" ]; then
     EXPECTED_PROJECT="ingresos-gastos-pwa-2026"
-elif [ "$CURRENT_DIR" == "USDT" ]; then
-    EXPECTED_PROJECT="saldo-app-452d6"
 fi
 
 if [ -z "$EXPECTED_PROJECT" ]; then

@@ -7,7 +7,15 @@ Este documento define la relación oficial entre las carpetas locales y los proy
 | Directorio Local | Proyecto Firebase (ID) | URL Hosting |
 | :--- | :--- | :--- |
 | `IngresosYGastos` | `ingresos-gastos-pwa-2026` | `https://ingresos-gastos-pwa-2026.web.app` |
-| `USDT` | `saldo-app-452d6` | `https://saldo-app-452d6.web.app` |
+| `USDT` | `ingresos-gastos-pwa-2026` (site `saldo-app-jdm`) | `https://saldo-app-jdm.web.app` |
+| `paypal` | `ingresos-gastos-pwa-2026` (site `conciliador-jdm`) | `https://conciliador-jdm.web.app` |
+
+> **⚠️ Comparten UN SOLO proyecto Firebase:** desde 2026-09-24, `USDT` y `paypal` migraron sus datos a
+> `ingresos-gastos-pwa-2026` y comparten el mismo proyecto que `IngresosYGastos`, con sitios de Hosting
+> separados. **Las reglas y los índices de Firestore se centralizan y despliegan SOLO desde esta carpeta**
+> (`firestore.rules` + `firestore.indexes.json`) — mismo patrón que las 4 apps de tenis.
+> NO agregues la sección `firestore` al `firebase.json` de `USDT` ni de `paypal`.
+> Los proyectos viejos `saldo-app-452d6` y `conciliador-pro-cloud` quedan solo como **backup**: no desplegarles.
 
 ---
 
