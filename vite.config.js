@@ -26,6 +26,9 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'prompt',
+      workbox: {
+        navigateFallbackDenylist: [/^\/__\//],
+      },
       manifest: {
         name: 'Ingresos y Gastos',
         short_name: 'Ingresos',
