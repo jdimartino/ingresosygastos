@@ -11,6 +11,7 @@ import NuevoRegistro from './pages/NuevoRegistro';
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Administracion = lazy(() => import('./pages/Administracion'));
 const Estadisticas = lazy(() => import('./pages/Estadisticas'));
+const Galpon = lazy(() => import('./pages/Galpon'));
 
 const PageLoader = () => (
   <div className="flex justify-center items-center py-20">
@@ -38,6 +39,13 @@ function App() {
                   <ProtectedRoute>
                     <ErrorBoundary>
                       <Dashboard />
+                    </ErrorBoundary>
+                  </ProtectedRoute>
+                } />
+                <Route path="galpon" element={
+                  <ProtectedRoute>
+                    <ErrorBoundary>
+                      <Galpon />
                     </ErrorBoundary>
                   </ProtectedRoute>
                 } />

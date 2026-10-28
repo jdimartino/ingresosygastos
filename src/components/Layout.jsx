@@ -1,7 +1,7 @@
 import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { TbPencilPlus, TbReportMoney, TbLogout, TbLogin, TbSettings, TbChartBar } from "react-icons/tb";
+import { TbPencilPlus, TbReportMoney, TbLogout, TbLogin, TbSettings, TbChartBar, TbBuildingWarehouse } from "react-icons/tb";
 
 const Layout = () => {
     const { user, loginWithGoogle, logOut } = useAuth();
@@ -11,6 +11,7 @@ const Layout = () => {
         { name: 'Registrar', path: '/registrar', icon: TbPencilPlus, public: true },
         { name: 'Dashboard', path: '/dashboard', icon: TbReportMoney, public: false },
         { name: 'Estadísticas', path: '/estadisticas', icon: TbChartBar, public: false },
+        { name: 'Galpón', path: '/galpon', icon: TbBuildingWarehouse, public: false },
         { name: 'Admin', path: '/admin', icon: TbSettings, public: false },
     ];
 
