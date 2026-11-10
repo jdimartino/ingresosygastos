@@ -6,6 +6,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import ReloadPrompt from './components/ReloadPrompt';
 import ErrorBoundary from './components/ErrorBoundary';
 import { TbLoaderQuarter } from 'react-icons/tb';
+import AuthDebugPanel from './components/AuthDebugPanel'; // TEMPORAL: diagnóstico (?debug=1)
+import { initAuthDebugFromUrl } from './utils/authDebug'; // TEMPORAL: diagnóstico (?debug=1)
 
 import NuevoRegistro from './pages/NuevoRegistro';
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -18,6 +20,8 @@ const PageLoader = () => (
     <TbLoaderQuarter className="animate-spin text-blue-500 text-4xl" />
   </div>
 );
+
+initAuthDebugFromUrl(); // TEMPORAL: activa/desactiva el diagnóstico según ?debug=1|0
 
 function App() {
   return (
@@ -69,6 +73,7 @@ function App() {
         </ErrorBoundary>
       </Router>
       <ReloadPrompt />
+      <AuthDebugPanel />
     </AuthProvider>
   );
 }
